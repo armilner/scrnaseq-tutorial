@@ -47,3 +47,7 @@ After the first render, review `results/annotation_proposed.csv` against the mar
 ## Outputs
 
 `results/cluster_markers.csv`, `results/pseudobulk_DE.csv`, `results/gsea.csv`, `results/kidney_snrna_annotated.rds`, `tutorial.html`
+
+## License
+
+Code is MIT licensed (see [LICENSE](LICENSE)). The data belongs to the original authors: Kang et al. 2018 (beginner) and Wilson et al. 2019, GSE131882 (advanced). Please cite them if you use it.
