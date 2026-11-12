@@ -1,0 +1,306 @@
+---
+title: "snRNA-seq in Seurat: what to question at each step"
+subtitle: "Human kidney, 3 control vs 3 diabetic (GSE131882), from Cell Ranger output to pathways"
+author: "Andrew Milner"
+format:
+  html:
+    toc: true
+    code-fold: show
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+params:
+  samplesheet: "samplesheet.csv"
+  resolution: 0.4
+  npcs: 30
+---
+
+Every section has the same three parts: the decision, the default used here, and when to deviate.
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(Seurat); library(SoupX); library(scDblFinder); library(SingleCellExperiment)
+  library(scuttle); library(harmony); library(DESeq2); library(fgsea); library(msigdbr)
+  library(Matrix); library(ggplot2); library(patchwork); library(dplyr)
+})
+set.seed(1234)
+options(future.globals.maxSize = 8 * 1024^3)
+dir.create("results", showWarnings = FALSE)
+ss <- read.csv(params$samplesheet)
+stopifnot(all(c("sample", "condition", "path") %in% names(ss)), all(dir.exists(ss$path)))
+ss
+```
+
+## 1. Ambient RNA
+
+**Decision:** correct or not. **Default:** SoupX on the raw droplet matrix, per sample. **Deviate:** CellBender if you have a GPU; skip only if the estimated contamination is trivial (rho under about 2%) and you say so.
+
+Nuclei preps lyse cytoplasm into the buffer, so highly expressed transcripts from abundant cell types show up everywhere. In kidney that means proximal tubule genes in every cluster. The uncorrected counts are kept as a second assay so the effect can be checked later.
+
+```{r soupx}
+read_one <- function(dir) {
+  filt <- Read10X(file.path(dir, "filtered_feature_bc_matrix"))
+  raw  <- Read10X(file.path(dir, "raw_feature_bc_matrix"))
+  if (is.list(filt)) { filt <- filt[[1]]; raw <- raw[[1]] }
+  quick <- CreateSeuratObject(filt) |>
+    NormalizeData(verbose = FALSE) |> FindVariableFeatures(verbose = FALSE) |>
+    ScaleData(verbose = FALSE) |> RunPCA(verbose = FALSE) |>
+    FindNeighbors(dims = 1:30, verbose = FALSE) |> FindClusters(resolution = 0.8, verbose = FALSE)
+  sc <- SoupChannel(raw, filt)
+  sc <- setClusters(sc, setNames(as.character(quick$seurat_clusters), colnames(quick)))
+  sc <- autoEstCont(sc, doPlot = FALSE)
+  list(corrected = adjustCounts(sc, roundToInt = TRUE), uncorrected = filt,
+       rho = unique(sc$metaData$rho))
+}
+raw_list <- lapply(setNames(ss$path, ss$sample), read_one)
+data.frame(sample = ss$sample, rho = round(sapply(raw_list, `[[`, "rho"), 3))
+```
+
+## 2. Doublets
+
+**Decision:** when and how. **Default:** scDblFinder per sample, after empty droplet removal and before strict QC. **Deviate:** raise the expected rate for overloaded lanes; inspect clusters that co-express markers of two lineages regardless of the call.
+
+Doublets only form within a capture, so this never runs on merged data. Filtering low-quality nuclei first changes the population the simulated doublets are drawn from.
+
+```{r doublets}
+objs <- lapply(ss$sample, function(s) {
+  x <- raw_list[[s]]
+  o <- CreateSeuratObject(x$corrected, project = s, min.cells = 0)
+  o[["uncorrected"]] <- CreateAssay5Object(counts = x$uncorrected[rownames(o), colnames(o)])
+  sce <- scDblFinder(SingleCellExperiment(list(counts = x$corrected)))
+  o$doublet_class <- as.character(sce$scDblFinder.class)
+  o$doublet_score <- sce$scDblFinder.score
+  o$sample <- s
+  o$condition <- ss$condition[ss$sample == s]
+  o[["percent.mt"]] <- PercentageFeatureSet(o, pattern = "^MT-")
+  o
+})
+names(objs) <- ss$sample
+rm(raw_list); invisible(gc())
+```
+
+## 3. QC
+
+**Decision:** thresholds. **Default:** per-sample outliers at 3 MADs on log counts and log features, with a floor on the mito cutoff. **Deviate:** loosen when a real cell type sits in a tail (low-RNA immune cells, large proximal tubule nuclei); tighten after clustering, not before.
+
+Fixed cutoffs copied between datasets are the most common error. In nuclei, percent mito should be near zero, so it flags debris and cytoplasmic carryover and is not a viability metric. Because the median is near zero, a pure MAD rule would be too strict, so the cutoff is never below 5%.
+
+```{r qc}
+qc_tab <- list()
+objs <- lapply(objs, function(o) {
+  lowc  <- isOutlier(o$nCount_RNA, nmads = 3, type = "lower", log = TRUE)
+  highc <- isOutlier(o$nCount_RNA, nmads = 3, type = "higher", log = TRUE)
+  lowf  <- isOutlier(o$nFeature_RNA, nmads = 3, type = "lower", log = TRUE)
+  mt_cut <- max(median(o$percent.mt) + 3 * mad(o$percent.mt), 5)
+  o$qc_fail <- lowc | highc | lowf | o$percent.mt > mt_cut
+  qc_tab[[o$sample[1]]] <<- data.frame(
+    sample = o$sample[1], nuclei = ncol(o), mt_cutoff = round(mt_cut, 2),
+    qc_fail = sum(o$qc_fail), doublets = sum(o$doublet_class == "doublet"),
+    kept = sum(!o$qc_fail & o$doublet_class == "singlet"))
+  o
+})
+do.call(rbind, qc_tab)
+```
+
+```{r qc-plot, fig.width=10, fig.height=4}
+md <- do.call(rbind, lapply(objs, function(o) o@meta.data))
+ggplot(md, aes(nCount_RNA, nFeature_RNA, colour = qc_fail | doublet_class == "doublet")) +
+  geom_point(size = 0.2, alpha = 0.4) + scale_x_log10() + scale_y_log10() +
+  facet_wrap(~sample, nrow = 1) + labs(colour = "removed") + theme_bw()
+```
+
+```{r filter}
+objs <- lapply(objs, function(o) subset(o, subset = qc_fail == FALSE & doublet_class == "singlet"))
+obj <- merge(objs[[1]], objs[-1], add.cell.ids = names(objs))
+rm(objs); invisible(gc())
+obj
+```
+
+## 4. Normalization
+
+**Decision:** which normalization feeds which step. **Default:** SCTransform per sample for PCA, clustering and UMAP; log-normalized RNA for marker tests and plots; raw counts for pseudobulk. **Deviate:** log-normalization throughout is a valid simpler choice and usually gives very similar clusters.
+
+After `merge`, each sample is its own layer, so SCTransform fits one model per sample.
+
+```{r normalize}
+obj <- SCTransform(obj, assay = "RNA", vst.flavor = "v2", verbose = FALSE)
+obj <- RunPCA(obj, npcs = 50, verbose = FALSE)
+ElbowPlot(obj, ndims = 50)
+```
+
+## 5. Integration
+
+**Decision:** integrate or not. **Default:** look at the unintegrated embedding first; apply Harmony on sample only if nuclei of the same type separate by sample. **Deviate:** skip integration when samples already mix; never use integrated values for differential expression.
+
+```{r integrate, fig.width=11, fig.height=4.5}
+dims <- 1:params$npcs
+obj <- RunUMAP(obj, reduction = "pca", dims = dims, reduction.name = "umap.unint", verbose = FALSE)
+obj <- RunHarmony(obj, group.by.vars = "sample", reduction.use = "pca", dims.use = dims,
+                  assay.use = "SCT", reduction.save = "harmony", verbose = FALSE)
+obj <- RunUMAP(obj, reduction = "harmony", dims = dims, reduction.name = "umap", verbose = FALSE)
+DimPlot(obj, reduction = "umap.unint", group.by = "sample") + ggtitle("Unintegrated") |
+  DimPlot(obj, reduction = "umap", group.by = "sample") + ggtitle("Harmony")
+```
+
+```{r cluster}
+obj <- FindNeighbors(obj, reduction = "harmony", dims = dims, verbose = FALSE)
+obj <- FindClusters(obj, resolution = params$resolution, verbose = FALSE)
+round(prop.table(table(obj$seurat_clusters, obj$sample), 1), 2)
+```
+
+A cluster made almost entirely of one sample is either biology specific to that donor or a leftover artifact. Check its QC metrics before believing it.
+
+```{r qc-second-pass, fig.width=10, fig.height=3.5}
+VlnPlot(obj, c("nFeature_RNA", "percent.mt", "doublet_score"), pt.size = 0, ncol = 3)
+```
+
+## 6. Markers
+
+**Decision:** how to describe clusters. **Default:** Wilcoxon on log-normalized RNA. **Deviate:** none needed, as long as these p-values are treated as descriptive. Nuclei are not replicates.
+
+```{r markers}
+DefaultAssay(obj) <- "RNA"
+obj <- JoinLayers(obj, assay = "RNA")
+obj <- NormalizeData(obj, verbose = FALSE)
+markers <- FindAllMarkers(obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.5, verbose = FALSE)
+write.csv(markers, "results/cluster_markers.csv", row.names = FALSE)
+markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 5) |> summarise(top = paste(gene, collapse = ", "))
+```
+
+## 7. Annotation
+
+**Decision:** where labels come from. **Default:** reference transfer when a good reference exists, checked against canonical markers, then approved by a person at cluster level. **Deviate:** no reference for your tissue or species means markers only.
+
+```{r canonical, fig.width=11, fig.height=5}
+canonical <- list(
+  Podocyte = c("NPHS1", "NPHS2"), PEC = c("CFH", "VCAM1"), PT = c("LRP2", "CUBN", "SLC34A1"),
+  TAL = c("SLC12A1", "UMOD"), DCT = c("SLC12A3"), CNT = c("SLC8A1", "CALB1"), PC = c("AQP2"),
+  IC_A = c("SLC4A1", "SLC26A7"), IC_B = c("SLC26A4"), Endothelial = c("EMCN", "FLT1"),
+  Stromal = c("PDGFRB", "ITGA8"), Immune = c("PTPRC"))
+DotPlot(obj, features = canonical, assay = "RNA") + RotatedAxis() + theme(strip.text = element_text(size = 7))
+```
+
+```{r reference}
+obj$reference_label <- NA_character_
+if (requireNamespace("Azimuth", quietly = TRUE)) {
+  az <- tryCatch(Azimuth::RunAzimuth(obj, reference = "kidneyref"), error = function(e) { message(e); NULL })
+  if (!is.null(az)) {
+    lab <- grep("^predicted\\.annotation\\.l2$", names(az@meta.data), value = TRUE)
+    if (length(lab)) obj$reference_label <- az@meta.data[colnames(obj), lab]
+    rm(az)
+  }
+}
+```
+
+The proposed label for each cluster is written to `results/annotation_proposed.csv`. Review it against the dot plot and the marker table, edit the `celltype` column, and save it as `annotation_approved.csv` in the project folder. The notebook uses the approved file when it exists.
+
+```{r approve}
+proposed <- obj@meta.data |> group_by(cluster = seurat_clusters) |>
+  summarise(n = n(),
+            reference_majority = if (all(is.na(reference_label))) NA_character_ else names(which.max(table(reference_label))),
+            agreement = if (all(is.na(reference_label))) NA_real_ else round(max(table(reference_label)) / n(), 2)) |>
+  mutate(celltype = ifelse(is.na(reference_majority), paste0("cluster_", cluster), reference_majority))
+write.csv(proposed, "results/annotation_proposed.csv", row.names = FALSE)
+ann <- if (file.exists("annotation_approved.csv")) read.csv("annotation_approved.csv") else proposed
+obj$celltype <- ann$celltype[match(as.character(obj$seurat_clusters), as.character(ann$cluster))]
+ann
+```
+
+```{r umap-final, fig.width=11, fig.height=5}
+DimPlot(obj, reduction = "umap", group.by = "celltype", label = TRUE, repel = TRUE) + NoLegend() |
+  DimPlot(obj, reduction = "umap", group.by = "condition")
+```
+
+## 8. Differential expression between conditions
+
+**Decision:** unit of replication. **Default:** pseudobulk, summing raw counts per cell type per sample, then DESeq2 with samples as replicates. **Deviate:** mixed models when you have many donors and need covariates at the cell level. Never a per-nucleus Wilcoxon between conditions.
+
+Counts here are the ambient-corrected integers. Whether to use corrected or uncorrected counts for pseudobulk is an open question, so the uncorrected assay is kept and the comparison is one argument away.
+
+```{r pseudobulk}
+pseudobulk <- function(obj, assay = "RNA") {
+  cts <- GetAssayData(JoinLayers(obj[[assay]]), layer = "counts")
+  grp <- factor(paste(obj$celltype, obj$sample, sep = "__"))
+  mm <- sparse.model.matrix(~ 0 + grp); colnames(mm) <- levels(grp)
+  list(counts = as.matrix(cts %*% mm), ncells = table(grp))
+}
+pb <- pseudobulk(obj, "RNA")
+run_de <- function(ct, min_cells = 10) {
+  cols <- names(pb$ncells)[sub("__.*", "", names(pb$ncells)) == ct & pb$ncells >= min_cells]
+  cd <- data.frame(sample = sub(".*__", "", cols), row.names = cols)
+  cd$condition <- factor(ss$condition[match(cd$sample, ss$sample)], levels = c("control", "diabetic"))
+  if (any(table(cd$condition) < 2)) return(NULL)
+  m <- pb$counts[, cols]
+  m <- m[rowSums(m >= 10) >= min(table(cd$condition)), ]
+  dds <- DESeq(DESeqDataSetFromMatrix(m, cd, ~ condition), quiet = TRUE)
+  res <- as.data.frame(results(dds, contrast = c("condition", "diabetic", "control")))
+  res$gene <- rownames(res); res$celltype <- ct
+  res[order(res$pvalue), ]
+}
+de <- Filter(Negate(is.null), lapply(setNames(nm = unique(obj$celltype)), run_de))
+de_all <- do.call(rbind, de)
+write.csv(de_all, "results/pseudobulk_DE.csv", row.names = FALSE)
+de_all |> group_by(celltype) |> summarise(tested = n(), sig = sum(padj < 0.05, na.rm = TRUE)) |> arrange(desc(sig))
+```
+
+With 3 vs 3 human samples, power is low and some cell types will return few or no genes at FDR 5%. That is the honest answer for this design, and it is the reason the next step uses the full ranked list.
+
+## 9. Pathways
+
+**Decision:** enrichment method and gene sets. **Default:** GSEA with fgsea on every tested gene ranked by the DESeq2 statistic, using Hallmark and Reactome. **Deviate:** over-representation is fine when you have a confident DEG list, but the background must be the genes tested in that cell type, not the genome. GO and KEGG largely repeat Reactome, so add them when a reviewer asks.
+
+```{r genesets}
+get_sets <- function(collection, sub = NULL) {
+  f <- names(formals(msigdbr))
+  a <- list(species = "Homo sapiens")
+  if ("collection" %in% f) { a$collection <- collection; if (!is.null(sub)) a$subcollection <- sub }
+  else { a$category <- collection; if (!is.null(sub)) a$subcategory <- sub }
+  d <- do.call(msigdbr, a)
+  split(d$gene_symbol, d$gs_name)
+}
+sets <- c(get_sets("H"), get_sets("C2", "CP:REACTOME"))
+length(sets)
+```
+
+```{r gsea}
+gsea <- lapply(de, function(res) {
+  r <- res[!is.na(res$stat), ]
+  stats <- sort(setNames(r$stat, r$gene), decreasing = TRUE)
+  out <- fgsea(sets, stats, minSize = 15, maxSize = 500)
+  out$celltype <- res$celltype[1]
+  out[order(out$padj), ]
+})
+gsea_all <- do.call(rbind, gsea)
+gsea_out <- as.data.frame(gsea_all)
+gsea_out$leadingEdge <- vapply(gsea_out$leadingEdge, paste, "", collapse = ";")
+write.csv(gsea_out, "results/gsea.csv", row.names = FALSE)
+```
+
+```{r gsea-plot, fig.width=10, fig.height=6}
+top_ct <- names(which.max(sapply(gsea, function(x) sum(x$padj < 0.05, na.rm = TRUE))))
+gsea[[top_ct]] |> as.data.frame() |> filter(!is.na(padj)) |> slice_min(padj, n = 20, with_ties = FALSE) |>
+  ggplot(aes(NES, reorder(pathway, NES), fill = padj < 0.05)) + geom_col() +
+  labs(y = NULL, title = paste("GSEA, diabetic vs control:", top_ct)) + theme_bw() +
+  theme(axis.text.y = element_text(size = 7))
+```
+
+Over-representation with the correct background, for comparison:
+
+```{r ora}
+if (requireNamespace("clusterProfiler", quietly = TRUE)) {
+  res <- de[[top_ct]]
+  sig <- res$gene[which(res$padj < 0.05)]
+  t2g <- stack(sets)[, 2:1]
+  if (length(sig) >= 10)
+    head(as.data.frame(clusterProfiler::enricher(sig, universe = res$gene, TERM2GENE = t2g))[, c("ID", "GeneRatio", "BgRatio", "p.adjust")], 10)
+  else cat("Fewer than 10 significant genes in", top_ct, "so ORA is not informative here.\n")
+}
+```
+
+## Save
+
+```{r save}
+saveRDS(obj, "results/kidney_snrna_annotated.rds")
+sessionInfo()
+```

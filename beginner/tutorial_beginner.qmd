@@ -1,0 +1,501 @@
+---
+title: "Single-cell RNA-seq from start to finish: beginner"
+subtitle: "PBMCs from 8 donors, control vs interferon-beta (Kang et al. 2018)"
+author: "Andrew Milner"
+format:
+  html:
+    toc: true
+    code-fold: show
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+---
+
+This is one complete single-cell analysis on a laptop, from a count matrix to pathways. Every step says what we do and why we do it. Most Seurat tutorials cover one step each, so you have to stitch them together yourself. Here everything is in one place and in order.
+
+**The data.** Blood cells (PBMCs) from 8 people. Each person's cells were split in two: one half left alone (`ctrl`) and one half treated with interferon-beta (`stim`). That gives us 8 control samples and 8 treated samples, and every treated sample has a matching control from the same person. It was run on 10x Genomics Chromium.
+
+**The question.** Which genes and pathways change in each cell type when cells are treated with interferon-beta?
+
+**The steps.**
+
+1. Load the data
+2. Remove ambient RNA
+3. Find doublets
+4. Quality control
+5. Normalize
+6. Integrate
+7. Cluster and UMAP
+8. Find marker genes
+9. Name the clusters
+10. Differential expression between conditions (pseudobulk)
+11. Pathway analysis
+12. Save
+
+New to R? Follow [GETTING_STARTED.md](GETTING_STARTED.md) first. It covers installing R and RStudio, the packages, and running this file.
+
+```{r setup}
+library(Seurat)
+library(SingleCellExperiment)
+library(muscData)     # the example data
+library(celda)        # decontX, for ambient RNA
+library(scDblFinder)  # doublets
+library(scuttle)      # QC helper
+library(harmony)      # integration
+library(SingleR)      # automatic cell type labels
+library(celldex)      # reference for SingleR
+library(DESeq2)       # differential expression
+library(fgsea)        # pathway analysis
+library(msigdbr)      # gene sets
+library(ggplot2)
+library(dplyr)
+
+set.seed(1234)  # so you get the same results every time
+dir.create("results", showWarnings = FALSE)
+```
+
+## 1. Load the data
+
+**What:** download the count matrix. Rows are genes, columns are cells, and each value is how many RNA molecules of that gene were counted in that cell.
+
+**Why:** everything else starts from these raw counts. The first download takes a minute, and after that the file is cached.
+
+```{r load}
+sce <- Kang18_8vs8()
+sce
+```
+
+A few genes appear more than once, for example `CD79A_ENSG00000105369` and `CD79A_ENSG00000272985`. The extra copies come from alternative versions of some chromosome regions and have almost no counts. We keep the copy with the most counts for each gene and give it its plain name, so that names like `CD79A` work in plots and match the pathway gene sets later.
+
+```{r gene-names}
+total_counts <- rowSums(counts(sce))
+sce <- sce[order(total_counts, decreasing = TRUE), ]
+sce <- sce[!duplicated(rowData(sce)$SYMBOL), ]
+rownames(sce) <- rowData(sce)$SYMBOL
+nrow(sce)
+```
+
+The table that comes with the cells tells us who each cell came from (`ind`), whether it was treated (`stim`), and what the original authors called it (`cell`). It also has a `multiplets` column, which we come back to in step 3.
+
+```{r look}
+# how many cells per person and condition
+table(sce$ind, sce$stim)
+```
+
+We make one sample name per person and condition, like `donor101-ctrl`. This is the unit we compare later.
+
+```{r sample-names}
+sce$sample <- paste0("donor", sce$ind, "-", sce$stim)
+```
+
+In this experiment all control cells were run in one 10x lane and all treated cells in another. A lane is called a capture. Ambient RNA and doublets happen inside one capture, so steps 2 to 4 are done separately for each capture. Here the capture is the same as `stim`.
+
+## 2. Remove ambient RNA
+
+**What:** when cells are loaded, some float-around RNA from broken cells ends up in every droplet. This is called ambient RNA or soup. We estimate how much each cell has and subtract it.
+
+**Why:** without this, genes from very common cells show up in every cell type. For example, monocyte genes can appear in T cells. This makes clusters look mixed and can create false differences later.
+
+**Which tool:** if you have the `raw_feature_bc_matrix` from Cell Ranger (all droplets, including empty ones), SoupX is the usual choice. This dataset only has the cells, with no empty droplets, so we use **decontX**. It works out the contamination from the cells alone.
+
+```{r decontx}
+sce <- decontX(sce, batch = sce$stim)
+
+# contamination per cell, from 0 (none) to 1 (all soup)
+summary(sce$decontX_contamination)
+```
+
+```{r decontx-plot, fig.width=6, fig.height=3.5}
+ggplot(as.data.frame(colData(sce)), aes(decontX_contamination)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~stim) +
+  labs(x = "estimated contamination", y = "cells") +
+  theme_bw()
+```
+
+Most cells have a small amount of contamination. We keep the corrected counts, rounded to whole numbers because later steps expect counts.
+
+```{r decontx-counts}
+corrected <- round(decontXcounts(sce))
+```
+
+## 3. Find doublets
+
+**What:** sometimes two cells land in the same droplet. That droplet looks like one cell that expresses the genes of both, for example a T cell and a B cell at once. These are doublets.
+
+**Why:** doublets can form fake clusters that look like a new cell type. We want to remove them before clustering.
+
+**How:** scDblFinder makes fake doublets by adding random pairs of cells together, then learns what doublets look like and scores every real cell. It runs on each capture separately because doublets can only form inside one capture.
+
+```{r doublets}
+sce_clean <- SingleCellExperiment(list(counts = corrected), colData = colData(sce))
+sce_clean <- scDblFinder(sce_clean, samples = "stim")
+table(sce_clean$scDblFinder.class)
+```
+
+This dataset has a bonus. The authors mixed cells from 8 people in each lane and used each person's DNA differences (with a tool called demuxlet) to find droplets containing two people. That is in the `multiplets` column. Let's compare the two.
+
+```{r doublets-compare}
+table(scDblFinder = sce_clean$scDblFinder.class, demuxlet = sce_clean$multiplets)
+```
+
+demuxlet can only see doublets made of two different people, and scDblFinder can only see doublets made of two different cell types, so they catch different droplets. We remove a cell if either tool calls it a doublet. demuxlet's `ambs` (ambiguous) cells are also removed, because we can't tell which person they came from.
+
+## 4. Quality control
+
+**What:** remove cells that look broken or empty.
+
+**Why:** a cell with very few genes is probably a broken cell or an empty droplet. A cell with a lot of mitochondrial RNA is often a dying cell that has lost most of its other RNA. These cells cluster together and look like a separate cell type when they are not.
+
+First we put the data into Seurat, which we use for the rest of the analysis. We also keep the uncorrected counts as a second assay, so you can compare later.
+
+```{r seurat}
+obj <- CreateSeuratObject(counts = corrected, meta.data = as.data.frame(colData(sce_clean)))
+obj[["uncorrected"]] <- CreateAssay5Object(counts = counts(sce))
+obj[["percent.mt"]] <- PercentageFeatureSet(obj, pattern = "^MT-")
+obj
+```
+
+The three numbers we look at:
+
+- `nCount_RNA`: total RNA molecules in the cell
+- `nFeature_RNA`: number of different genes found in the cell
+- `percent.mt`: percent of RNA from mitochondrial genes
+
+```{r qc-violin, fig.width=10, fig.height=4}
+VlnPlot(obj, features = c("nCount_RNA", "nFeature_RNA", "percent.mt"),
+        group.by = "stim", pt.size = 0, ncol = 3)
+```
+
+**How to pick cutoffs.** Don't copy numbers from another dataset. Instead, flag cells that are far from the middle of their own capture. "Far" here means more than 3 MADs (median absolute deviations, a robust version of the standard deviation). We use log values because counts are skewed.
+
+For mitochondrial percent we only flag the high side. We also never set that cutoff below 10%, because in healthy blood cells mito is low and a pure MAD rule would throw out good cells.
+
+```{r qc-flags}
+low_counts   <- isOutlier(obj$nCount_RNA,   nmads = 3, log = TRUE, type = "lower",  batch = obj$stim)
+high_counts  <- isOutlier(obj$nCount_RNA,   nmads = 3, log = TRUE, type = "higher", batch = obj$stim)
+low_genes    <- isOutlier(obj$nFeature_RNA, nmads = 3, log = TRUE, type = "lower",  batch = obj$stim)
+high_mito    <- isOutlier(obj$percent.mt,   nmads = 3, type = "higher", batch = obj$stim)
+high_mito    <- high_mito & obj$percent.mt > 10
+
+obj$qc_fail <- low_counts | high_counts | low_genes | high_mito
+obj$doublet <- obj$scDblFinder.class == "doublet" | obj$multiplets != "singlet"
+```
+
+How many cells each rule removes, per capture:
+
+```{r qc-table}
+qc_table <- data.frame(
+  capture      = c("ctrl", "stim"),
+  cells        = as.vector(table(obj$stim)),
+  low_counts   = as.vector(tapply(low_counts,  obj$stim, sum)),
+  high_counts  = as.vector(tapply(high_counts, obj$stim, sum)),
+  low_genes    = as.vector(tapply(low_genes,   obj$stim, sum)),
+  high_mito    = as.vector(tapply(high_mito,   obj$stim, sum)),
+  doublets     = as.vector(tapply(obj$doublet, obj$stim, sum)),
+  kept         = as.vector(tapply(!obj$qc_fail & !obj$doublet, obj$stim, sum))
+)
+qc_table
+write.csv(qc_table, "results/qc_table.csv", row.names = FALSE)
+```
+
+```{r qc-scatter, fig.width=9, fig.height=4}
+obj$removed <- obj$qc_fail | obj$doublet
+ggplot(obj@meta.data, aes(nCount_RNA, nFeature_RNA, colour = removed)) +
+  geom_point(size = 0.2, alpha = 0.4) +
+  scale_x_log10() + scale_y_log10() +
+  facet_wrap(~stim) +
+  theme_bw()
+```
+
+Now remove them.
+
+```{r filter}
+obj <- subset(obj, subset = removed == FALSE)
+obj
+```
+
+## 5. Normalize
+
+**What:** make cells comparable. Some cells were sequenced more deeply than others, so their counts are all higher. Normalizing divides each cell by its total, multiplies by 10,000, and takes the log.
+
+**Why:** without this, the biggest difference between cells would just be how deeply each one was sequenced.
+
+We then pick the 2,000 most variable genes. These carry most of the information about cell types, and using only them makes the next steps faster and less noisy. Scaling puts every gene on the same range so that very highly expressed genes don't dominate. PCA then squeezes those 2,000 genes into 30 summary dimensions.
+
+```{r normalize}
+obj <- NormalizeData(obj)
+obj <- FindVariableFeatures(obj, nfeatures = 2000)
+obj <- ScaleData(obj)
+obj <- RunPCA(obj, npcs = 50)
+```
+
+The elbow plot shows how much each PCA dimension explains. Past about 20 to 30 the line flattens, so 30 is a safe choice.
+
+```{r elbow, fig.width=5, fig.height=3.5}
+ElbowPlot(obj, ndims = 50)
+```
+
+## 6. Integrate
+
+**What:** line up the two captures so the same cell type from each sits together.
+
+**Why:** interferon changes the expression of hundreds of genes in every cell. On top of that, the two conditions were run in different lanes. So before integration, a treated T cell and a control T cell end up far apart, and we can't name cell types across both.
+
+First look without integration. Always do this first. If cells already mix, you don't need integration.
+
+```{r umap-before, fig.width=6, fig.height=4.5}
+obj <- RunUMAP(obj, dims = 1:30, reduction.name = "umap_unintegrated")
+DimPlot(obj, reduction = "umap_unintegrated", group.by = "stim") + ggtitle("Before integration")
+```
+
+Each cell type splits into a control island and a treated island. We use Harmony, which nudges the PCA dimensions until the two groups mix within each cell type.
+
+```{r harmony, fig.width=6, fig.height=4.5}
+obj <- RunHarmony(obj, group.by.vars = "stim")
+obj <- RunUMAP(obj, reduction = "harmony", dims = 1:30)
+DimPlot(obj, reduction = "umap", group.by = "stim") + ggtitle("After Harmony")
+```
+
+Important: Harmony only changes the embedding (the coordinates used for clustering and UMAP). The counts stay untouched. We never use integrated values to test genes.
+
+## 7. Cluster and UMAP
+
+**What:** group cells that have similar expression.
+
+**Why:** clusters are the starting point for naming cell types.
+
+`FindNeighbors` links each cell to the cells most like it. `FindClusters` cuts that network into groups. The `resolution` controls how many groups you get: higher means more, smaller clusters. 0.5 is a common start for PBMCs.
+
+```{r cluster, fig.width=6, fig.height=4.5}
+obj <- FindNeighbors(obj, reduction = "harmony", dims = 1:30)
+obj <- FindClusters(obj, resolution = 0.5)
+DimPlot(obj, reduction = "umap", label = TRUE) + NoLegend()
+```
+
+Check that every cluster has cells from both conditions and from all donors. A cluster from only one person deserves a closer look.
+
+```{r cluster-mix}
+table(obj$seurat_clusters, obj$stim)
+```
+
+## 8. Find marker genes
+
+**What:** for each cluster, find genes that are higher there than in all other clusters.
+
+**Why:** marker genes tell you what each cluster is. For example, CD3E marks T cells and MS4A1 marks B cells.
+
+We use the normalized RNA values from step 5 and the Wilcoxon test. The p-values here only describe the clusters. Each cell is not an independent sample, so don't use them as real statistics.
+
+```{r markers}
+obj <- JoinLayers(obj)
+markers <- FindAllMarkers(obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.5)
+write.csv(markers, "results/cluster_markers.csv", row.names = FALSE)
+
+# top 5 per cluster
+top5 <- markers %>% group_by(cluster) %>% slice_max(avg_log2FC, n = 5)
+top5
+```
+
+Well-known PBMC marker genes, as a dot plot. Bigger dots mean more cells express the gene, and darker means higher expression.
+
+```{r dotplot, fig.width=10, fig.height=5}
+known_markers <- c("CD3E", "IL7R", "CCR7", "CD8A", "GNLY", "NKG7",
+                   "MS4A1", "CD79A", "CD14", "LYZ", "FCGR3A",
+                   "FCER1A", "CST3", "PPBP")
+DotPlot(obj, features = known_markers) + RotatedAxis()
+```
+
+## 9. Name the clusters
+
+**What:** give each cluster a cell type name.
+
+**Why:** the rest of the analysis is done per cell type.
+
+**How:** use two sources and check that they agree.
+
+1. An automatic guess. SingleR compares each cell to a reference of sorted immune cells (Monaco et al.) and picks the closest type.
+2. The marker genes from step 8.
+
+```{r singler}
+ref <- MonacoImmuneData()
+pred <- SingleR(test = GetAssayData(obj, layer = "data"), ref = ref, labels = ref$label.main)
+obj$singler_label <- pred$labels
+```
+
+Now take the most common SingleR label in each cluster.
+
+```{r propose}
+label_table <- table(obj$seurat_clusters, obj$singler_label)
+
+proposed <- data.frame(
+  cluster   = rownames(label_table),
+  n_cells   = rowSums(label_table),
+  singler   = colnames(label_table)[apply(label_table, 1, which.max)],
+  agreement = round(apply(label_table, 1, max) / rowSums(label_table), 2)
+)
+proposed$celltype <- proposed$singler
+proposed
+write.csv(proposed, "results/annotation_proposed.csv", row.names = FALSE)
+```
+
+`agreement` is the share of cells in the cluster with that label. Low agreement means the cluster is mixed or the reference doesn't fit well, so check the dot plot.
+
+**Your turn.** Open `results/annotation_proposed.csv`, check each label against the dot plot and markers, change the `celltype` column if needed, and save it as `annotation_approved.csv` next to this file. If that file exists, the notebook uses it.
+
+```{r apply-labels}
+if (file.exists("annotation_approved.csv")) {
+  annotation <- read.csv("annotation_approved.csv")
+} else {
+  annotation <- proposed
+}
+obj$celltype <- annotation$celltype[match(obj$seurat_clusters, annotation$cluster)]
+```
+
+As a check, compare with the labels from the original paper.
+
+```{r compare-paper}
+table(ours = obj$celltype, paper = obj$cell)
+```
+
+```{r umap-labels, fig.width=11, fig.height=4.5}
+DimPlot(obj, reduction = "umap", group.by = "celltype", label = TRUE, repel = TRUE) + NoLegend() +
+  DimPlot(obj, reduction = "umap", group.by = "stim")
+```
+
+## 10. Differential expression between conditions
+
+**What:** for each cell type, find genes that go up or down with interferon.
+
+**Why pseudobulk:** the replicates in this experiment are the 8 people, not the thousands of cells. Cells from the same person are more alike than cells from different people. If you test cell by cell, you pretend you have thousands of replicates and get far too many "significant" genes.
+
+**How:** for each cell type, add up the raw counts of all cells from each sample. That gives one column per sample, like a small bulk RNA-seq experiment. Then run DESeq2, the standard bulk tool.
+
+Because each person has both a control and a treated sample, the design is `~ ind + stim`. This compares treated to control within each person, which removes differences between people.
+
+```{r pseudobulk}
+celltypes <- unique(obj$celltype)
+de_results <- list()
+
+for (ct in celltypes) {
+  cells <- subset(obj, subset = celltype == ct)
+
+  # only use samples with at least 10 cells of this type
+  cell_counts <- table(cells$sample)
+  keep_samples <- names(cell_counts)[cell_counts >= 10]
+
+  # need at least 2 samples in each condition, or there is nothing to compare
+  n_ctrl <- sum(grepl("-ctrl$", keep_samples))
+  n_stim <- sum(grepl("-stim$", keep_samples))
+  if (n_ctrl < 2 | n_stim < 2) {
+    cat(paste0("Skipping ", ct, ": only ", n_ctrl, " control and ", n_stim,
+               " treated samples have 10 or more cells.\n"))
+    next
+  }
+  cells <- subset(cells, subset = sample %in% keep_samples)
+
+  # add up counts per sample
+  pb <- AggregateExpression(cells, assays = "RNA", group.by = "sample")$RNA
+  pb <- round(as.matrix(pb))
+
+  # sample table: which person and condition each column is
+  info <- data.frame(sample = colnames(pb))
+  info$ind  <- factor(cells$ind[match(info$sample, cells$sample)])
+  info$stim <- factor(cells$stim[match(info$sample, cells$sample)], levels = c("ctrl", "stim"))
+
+  # drop genes with almost no counts
+  pb <- pb[rowSums(pb >= 10) >= 2, ]
+
+  dds <- DESeqDataSetFromMatrix(pb, colData = info, design = ~ ind + stim)
+  dds <- DESeq(dds, quiet = TRUE)
+  res <- as.data.frame(results(dds, contrast = c("stim", "stim", "ctrl")))
+  res$gene <- rownames(res)
+  res$celltype <- ct
+  de_results[[ct]] <- res
+}
+
+de_all <- bind_rows(de_results)
+write.csv(de_all, "results/pseudobulk_DE.csv", row.names = FALSE)
+```
+
+How many genes change in each cell type (adjusted p-value under 0.05):
+
+```{r de-summary}
+de_summary <- de_all %>%
+  group_by(celltype) %>%
+  summarise(genes_tested = n(), significant = sum(padj < 0.05, na.rm = TRUE)) %>%
+  arrange(desc(significant))
+de_summary
+```
+
+Interferon is a strong signal, so expect many significant genes. Known interferon genes like ISG15, IFI6 and MX1 should be near the top.
+
+```{r de-top}
+de_all %>% filter(celltype == de_summary$celltype[1]) %>% arrange(padj) %>% head(10)
+```
+
+## 11. Pathway analysis
+
+**What:** find groups of genes (pathways) that move together.
+
+**Why:** a list of hundreds of genes is hard to read. Pathways turn it into a few ideas, like "interferon response is up".
+
+**How:** GSEA (with the fgsea package). Rank every tested gene by the DESeq2 statistic, from most up to most down, and ask whether the genes of a pathway pile up at the top or bottom. It uses all genes, not just the significant ones, so it also works when few genes pass the cutoff.
+
+Gene sets come from MSigDB: Hallmark (50 broad, well-curated sets) and Reactome (detailed pathways).
+
+```{r genesets}
+hallmark <- msigdbr(species = "human", collection = "H")
+reactome <- msigdbr(species = "human", collection = "C2", subcollection = "CP:REACTOME")
+genesets <- rbind(hallmark, reactome)
+genesets <- split(genesets$gene_symbol, genesets$gs_name)
+length(genesets)
+```
+
+```{r gsea}
+gsea_results <- list()
+
+for (ct in names(de_results)) {
+  res <- de_results[[ct]]
+  res <- res[!is.na(res$stat), ]
+
+  ranks <- res$stat
+  names(ranks) <- res$gene
+  ranks <- sort(ranks, decreasing = TRUE)
+
+  gs <- fgsea(genesets, ranks, minSize = 15, maxSize = 500)
+  gs$celltype <- ct
+  gsea_results[[ct]] <- gs
+}
+
+gsea_all <- bind_rows(gsea_results)
+gsea_all$leadingEdge <- sapply(gsea_all$leadingEdge, paste, collapse = ";")
+write.csv(gsea_all, "results/gsea.csv", row.names = FALSE)
+```
+
+Top pathways for the cell type with the most significant genes. Positive NES means the pathway goes up with interferon.
+
+```{r gsea-plot, fig.width=10, fig.height=6}
+top_ct <- de_summary$celltype[1]
+top_paths <- gsea_all %>% filter(celltype == top_ct) %>% arrange(padj) %>% head(20)
+
+ggplot(top_paths, aes(NES, reorder(pathway, NES), fill = padj < 0.05)) +
+  geom_col() +
+  labs(y = NULL, title = paste("Top pathways, stim vs ctrl:", top_ct)) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 7))
+```
+
+`HALLMARK_INTERFERON_ALPHA_RESPONSE` and `HALLMARK_INTERFERON_GAMMA_RESPONSE` should be at the top. If they are, the whole pipeline worked.
+
+## 12. Save
+
+```{r save}
+saveRDS(obj, "results/pbmc_ifnb_annotated.rds")
+sessionInfo()
+```
+
+## Where to go next
+
+The advanced tutorial starts from raw sequencing files (FASTQ) on a computing cluster, runs Cell Ranger, and analyses single-nucleus data from human kidney. It uses SoupX with the raw droplet matrix and SCTransform normalization.

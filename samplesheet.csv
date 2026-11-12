@@ -1,0 +1,7 @@
+sample,condition,path
+control_1,control,data/cellranger/control_1/outs
+control_2,control,data/cellranger/control_2/outs
+control_3,control,data/cellranger/control_3/outs
+diabetic_1,diabetic,data/cellranger/diabetic_1/outs
+diabetic_2,diabetic,data/cellranger/diabetic_2/outs
+diabetic_3,diabetic,data/cellranger/diabetic_3/outs
