@@ -51,7 +51,7 @@ library(msigdbr)      # gene sets
 library(ggplot2)
 library(dplyr)
 
-set.seed(1234)  # so you get the same results every time
+set.seed(42)  # so you get the same results every time
 dir.create("results", showWarnings = FALSE)
 ```
 
