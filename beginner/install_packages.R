@@ -3,17 +3,11 @@
 
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 
-cran <- c("Seurat", "harmony", "msigdbr", "ggplot2", "dplyr", "rmarkdown", "knitr")
+cran <- c("Seurat", "presto", "harmony", "msigdbr", "ggplot2", "dplyr", "rmarkdown", "knitr")
 bioc <- c("SingleCellExperiment", "muscData", "celda", "scDblFinder", "scuttle",
-          "SingleR", "celldex", "DESeq2", "fgsea", "glmGamPoi")
+          "DESeq2", "fgsea", "glmGamPoi")
 
 BiocManager::install(c(cran, bioc), ask = FALSE, update = FALSE)
-
-# presto makes marker finding much faster (optional)
-if (!requireNamespace("presto", quietly = TRUE)) {
-  if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
-  remotes::install_github("immunogenomics/presto")
-}
 
 # check
 for (p in c(cran, bioc)) {

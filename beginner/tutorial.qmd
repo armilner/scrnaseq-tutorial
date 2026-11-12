@@ -53,8 +53,6 @@ library(celda)        # decontX, for ambient RNA
 library(scDblFinder)  # doublets
 library(scuttle)      # QC helper
 library(harmony)      # integration
-library(SingleR)      # automatic cell type labels
-library(celldex)      # reference for SingleR
 library(DESeq2)       # differential expression
 library(fgsea)        # pathway analysis
 library(msigdbr)      # gene sets
@@ -323,34 +321,54 @@ DotPlot(obj, features = known_markers) + RotatedAxis()
 
 **Why:** the rest of the analysis is done per cell type.
 
-**How:** use two sources and check that they agree.
+**How:** first make an automatic guess from known marker genes, then check it by eye.
 
-1. An automatic guess. SingleR compares each cell to a reference of sorted immune cells (Monaco et al.) and picks the closest type.
-2. The marker genes from step 8.
+We write down a short list of well-known marker genes for each blood cell type. `AddModuleScore` gives every cell a score for each list: how much higher those genes are in that cell than random genes with similar expression. Each cell gets the name of its highest-scoring list.
 
-```{r singler}
-ref <- MonacoImmuneData()
-pred <- SingleR(test = GetAssayData(obj, layer = "data"), ref = ref, labels = ref$label.main)
-obj$singler_label <- pred$labels
+```{r marker-scores}
+cell_type_markers <- list(
+  "CD14+ Monocytes"   = c("CD14", "LYZ", "S100A8", "S100A9"),
+  "FCGR3A+ Monocytes" = c("FCGR3A", "MS4A7"),
+  "CD4+ T cells"      = c("CD3D", "IL7R"),
+  "CD8+ T cells"      = c("CD8A", "CD8B"),
+  "NK cells"          = c("GNLY", "NKG7", "KLRF1"),
+  "B cells"           = c("MS4A1", "CD79A"),
+  "Dendritic cells"   = c("FCER1A", "CD1C"),
+  "pDC"               = c("LILRA4", "CLEC4C"),
+  "Megakaryocytes"    = c("PPBP", "PF4")
+)
+
+obj <- AddModuleScore(obj, features = cell_type_markers, name = "score")
+
+# the scores are saved as score1, score2, ... in the same order as the list
+scores <- obj@meta.data[, paste0("score", 1:length(cell_type_markers))]
+colnames(scores) <- names(cell_type_markers)
+
+# each cell gets the name with the highest score
+obj$marker_guess <- colnames(scores)[apply(scores, 1, which.max)]
 ```
 
-Now take the most common SingleR label in each cluster.
+Now take the most common guess in each cluster.
 
 ```{r propose}
-label_table <- table(obj$seurat_clusters, obj$singler_label)
+label_table <- table(obj$seurat_clusters, obj$marker_guess)
 
 proposed <- data.frame(
-  cluster   = rownames(label_table),
-  n_cells   = rowSums(label_table),
-  singler   = colnames(label_table)[apply(label_table, 1, which.max)],
-  agreement = round(apply(label_table, 1, max) / rowSums(label_table), 2)
+  cluster      = rownames(label_table),
+  n_cells      = rowSums(label_table),
+  marker_guess = colnames(label_table)[apply(label_table, 1, which.max)],
+  agreement    = round(apply(label_table, 1, max) / rowSums(label_table), 2)
 )
-proposed$celltype <- proposed$singler
+proposed$celltype <- proposed$marker_guess
 proposed
 write.csv(proposed, "results/annotation_proposed.csv", row.names = FALSE)
 ```
 
-`agreement` is the share of cells in the cluster with that label. Low agreement means the cluster is mixed or the reference doesn't fit well, so check the dot plot.
+`agreement` is the share of cells in the cluster with that guess. Low agreement means the cluster is mixed or the marker lists don't separate it well, so check the dot plot and the top markers from step 8.
+
+An automatic guess is only as good as its marker lists. A cluster with markers that aren't on any list, for example stressed cells with high heat-shock genes, still gets the closest name. That is why a person checks every label.
+
+There are other ways to make the automatic guess. Reference-based tools such as SingleR or Azimuth compare your cells to a labelled dataset. They need extra packages and a reference download, and they make mistakes too.
 
 **Your turn.** Open `results/annotation_proposed.csv`, check each label against the dot plot and markers, change the `celltype` column if needed, and save it as `annotation_approved.csv` next to this file. If that file exists, the notebook uses it.
 

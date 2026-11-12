@@ -1,14 +1,14 @@
-cluster,n_cells,singler,agreement,celltype
-0,5514,Monocytes,0.99,CD14+ Monocytes
-1,3915,CD4+ T cells,0.92,CD4+ T cells
-2,3381,CD4+ T cells,0.81,CD4+ T cells
-3,2028,CD8+ T cells,0.6,CD8+ T cells
-4,2026,B cells,1,B cells
-5,1632,NK cells,0.72,NK cells
-6,1186,CD8+ T cells,0.61,CD8+ T cells
-7,1059,Monocytes,1,FCGR3A+ Monocytes
-8,829,CD4+ T cells,0.85,CD4+ T cells
-9,473,CD4+ T cells,0.5,Megakaryocytes
-10,450,Monocytes,0.71,Dendritic cells
-11,380,B cells,1,B cells
-12,41,Dendritic cells,1,pDC
+cluster,n_cells,marker_guess,agreement,celltype
+0,5514,CD14+ Monocytes,0.7,CD14+ Monocytes
+1,3915,CD4+ T cells,0.74,CD4+ T cells
+2,3381,CD4+ T cells,0.66,CD4+ T cells
+3,2028,NK cells,0.46,CD8+ T cells
+4,2026,B cells,0.84,B cells
+5,1632,NK cells,0.98,NK cells
+6,1186,CD4+ T cells,0.56,CD8+ T cells
+7,1059,FCGR3A+ Monocytes,0.98,FCGR3A+ Monocytes
+8,829,CD4+ T cells,0.49,CD4+ T cells
+9,473,Megakaryocytes,0.63,Megakaryocytes
+10,450,CD14+ Monocytes,0.52,Dendritic cells
+11,380,B cells,0.58,B cells
+12,41,pDC,0.71,pDC
