@@ -29,7 +29,7 @@ jobs:
         run: Rscript install_packages.R
       - name: Check nothing is missing
         run: |
-          Rscript -e "p <- c('Seurat','harmony','msigdbr','muscData','celda','scDblFinder','scuttle','SingleR','celldex','DESeq2','fgsea'); m <- p[!sapply(p, requireNamespace, quietly = TRUE)]; if (length(m)) stop('missing ', paste(m, collapse = ', '))"
+          Rscript -e "p <- c('Seurat','harmony','msigdbr','muscData','celda','scDblFinder','scuttle','presto','DESeq2','fgsea'); m <- p[!sapply(p, requireNamespace, quietly = TRUE)]; if (length(m)) stop('missing ', paste(m, collapse = ', '))"
       - name: Render the tutorial
         if: runner.os != 'macOS'   # the free Mac runner has only 7 GB of RAM
         run: quarto render tutorial.qmd
