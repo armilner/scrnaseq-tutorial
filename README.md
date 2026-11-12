@@ -1,52 +1,23 @@
-# Single-cell RNA-seq in Seurat: a complete walkthrough
+# Single-cell RNA-seq, start to finish
 
-One tutorial that goes through every step of a single-cell analysis in order, from counts to pathways, and says why each step is there.
+One tutorial that walks through a complete single-cell RNA-seq analysis in R, one step at a time, and explains why each step is there.
 
-**Just want to read it? [Open the finished beginner tutorial](https://armilner.github.io/scrnaseq-tutorial/beginner/tutorial_beginner.html)**, with all the code, plots and results in your browser. Nothing to install.
+![](beginner/thumbnail.png)
 
-## Pick your level
+## Start here
 
-| | Beginner | Advanced |
+**Just want to read it?**
+[Open the finished tutorial in your browser](https://armilner.github.io/scrnaseq-tutorial/beginner/tutorial.html). All the code, plots and results are there, and you don't need to install anything.
+
+**Want to run it yourself?**
+Go to the [`beginner`](beginner) folder and follow the steps. It runs on a normal laptop, and you don't need any experience.
+
+## What's in this repository
+
+| Folder | What it is | Who it's for |
 |---|---|---|
-| Folder | [`beginner/`](beginner/README.md) | this folder |
-| Data | Blood cells (PBMC), 8 donors, control vs interferon-beta | Human kidney single-nucleus, 3 control vs 3 diabetic (GSE131882) |
-| Starts from | A count matrix that downloads automatically | Raw sequencing files (FASTQ) |
-| Runs on | Your laptop, about 20 minutes | A computing cluster (Cell Ranger) |
-| Status | Ready | Draft, not yet run end to end |
-
-**New to all of this? Start here: [beginner/GETTING_STARTED.md](beginner/GETTING_STARTED.md).** It shows you how to install R and RStudio and run the tutorial with a few clicks. No terminal needed.
-
----
-
-# Advanced: snRNA-seq from FASTQ on a cluster
-
-A full 10x single-nucleus workflow on a public human kidney dataset (GSE131882, 3 control vs 3 early diabetic nephropathy; Wilson et al., PNAS 2019). Each step states the decision, the default, and when to deviate.
-
-## Input
-
-Cell Ranger `outs/` per sample, containing both `raw_feature_bc_matrix/` and `filtered_feature_bc_matrix/`. The raw matrix is required for ambient RNA correction, which is why this starts from FASTQs (SRA) and not from processed GEO tables. Paths go in `samplesheet.csv`.
-
-GEO only has zUMIs count matrices as RDS (already barcode-filtered), so there is no raw droplet matrix to download. FASTQs are in SRA under SRP199727 (BioProject PRJNA545232), samples GSM3823939 to GSM3823944. Libraries are 10x Chromium Single Cell 5'.
-
-Suggested route: nf-core/fetchngs for SRP199727, then nf-core/scrnaseq with `--aligner cellranger` on GRCh38. Introns are counted by default in Cell Ranger 7 and later. Point `samplesheet.csv` at each sample's `outs/` folder.
-
-## Run
-
-```bash
-./run.sh check     # package versions inside the container
-./run.sh render    # renders tutorial.html
-ENGINE=apptainer ./run.sh render   # on HPC
-```
-
-Container: `ghcr.io/armilner/r-bioinformatics-2026`
-
-## Manual step
-
-After the first render, review `results/annotation_proposed.csv` against the marker dot plot, edit the `celltype` column, save it as `annotation_approved.csv` in this folder, and render again.
-
-## Outputs
-
-`results/cluster_markers.csv`, `results/pseudobulk_DE.csv`, `results/gsea.csv`, `results/kidney_snrna_annotated.rds`, `tutorial.html`
+| [`beginner/`](beginner) | Complete analysis of blood cells from 8 people, untreated vs treated with interferon. Runs on a laptop. | Anyone new to single-cell |
+| [`advanced/`](advanced) | Kidney single-nucleus data, starting from raw sequencing files on a computing cluster. **Work in progress.** | People with cluster access |
 
 ## License
 

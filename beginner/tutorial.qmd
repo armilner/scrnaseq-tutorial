@@ -7,6 +7,16 @@ format:
     toc: true
     code-fold: show
     embed-resources: true
+    include-in-header:
+      text: |
+        <meta property="og:title" content="Single-cell RNA-seq, start to finish">
+        <meta property="og:description" content="One complete Seurat tutorial. Every step, in order, and why. Runs on a laptop.">
+        <meta property="og:image" content="https://armilner.github.io/scrnaseq-tutorial/beginner/thumbnail.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="627">
+        <meta property="og:url" content="https://armilner.github.io/scrnaseq-tutorial/beginner/tutorial.html">
+        <meta property="og:type" content="article">
+        <meta name="twitter:card" content="summary_large_image">
 execute:
   warning: false
   message: false
@@ -33,7 +43,7 @@ This is one complete single-cell analysis on a laptop, from a count matrix to pa
 11. Pathway analysis
 12. Save
 
-New to R? Follow [the setup guide](https://github.com/armilner/scrnaseq-tutorial/blob/main/beginner/GETTING_STARTED.md) first. It covers installing R and RStudio, the packages, and running this file.
+Want to run it yourself? The [setup steps](https://github.com/armilner/scrnaseq-tutorial/tree/main/beginner#step-1-install-r) cover installing R and RStudio, the packages, and running this file. No experience needed.
 
 ```{r setup}
 library(Seurat)
