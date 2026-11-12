@@ -33,7 +33,7 @@ This is one complete single-cell analysis on a laptop, from a count matrix to pa
 11. Pathway analysis
 12. Save
 
-New to R? Follow [GETTING_STARTED.md](GETTING_STARTED.md) first. It covers installing R and RStudio, the packages, and running this file.
+New to R? Follow [the setup guide](https://github.com/armilner/scrnaseq-tutorial/blob/main/beginner/GETTING_STARTED.md) first. It covers installing R and RStudio, the packages, and running this file.
 
 ```{r setup}
 library(Seurat)
