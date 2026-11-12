@@ -2,6 +2,8 @@
 
 One tutorial that goes through every step of a single-cell analysis in order, from counts to pathways, and says why each step is there.
 
+**Just want to read it? [Open the finished beginner tutorial](https://armilner.github.io/scrnaseq-tutorial/beginner/tutorial_beginner.html)**, with all the code, plots and results in your browser. Nothing to install.
+
 ## Pick your level
 
 | | Beginner | Advanced |

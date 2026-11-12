@@ -4,6 +4,8 @@ One notebook, one laptop, every step of a full analysis in order. Each step says
 
 Data: PBMCs from 8 donors, control vs interferon-beta (Kang et al., Nature Biotechnology 2018). It downloads automatically through the Bioconductor package `muscData`, so you don't need to fetch anything yourself.
 
+**[Read the finished tutorial online](https://armilner.github.io/scrnaseq-tutorial/beginner/tutorial_beginner.html)** with all code, plots and results.
+
 **Never used R or a terminal? Read [GETTING_STARTED.md](GETTING_STARTED.md) first.** It walks you through installing R and RStudio and running this with a few clicks.
 
 ## Run
