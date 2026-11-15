@@ -3722,23 +3722,27 @@ Elapsed time: 2 seconds</code></pre>
 <p><code>agreement</code> is the share of cells in the cluster with that guess. Low agreement means the cluster is mixed or the marker lists don’t separate it well, so check the dot plot and the top markers from step 8.</p>
 <p>An automatic guess is only as good as its marker lists. A cluster with markers that aren’t on any list, for example stressed cells with high heat-shock genes, still gets the closest name. That is why a person checks every label.</p>
 <p>There are other ways to make the automatic guess. Reference-based tools such as SingleR or Azimuth compare your cells to a labelled dataset. They need extra packages and a reference download, and they make mistakes too.</p>
-<p><strong>Your turn.</strong> Open <code>results/annotation_proposed.csv</code>, check each label against the dot plot and markers, change the <code>celltype</code> column if needed, and save it as <code>annotation_approved.csv</code> next to this file. If that file exists, the notebook uses it. This repository already includes ours. If your clusters come out different (for example with newer package versions), the notebook stops and tells you to delete it and review your own.</p>
+<p><strong>Your turn.</strong> Open <code>results/annotation_proposed.csv</code>, check each label against the dot plot and markers, change the <code>celltype</code> column if needed, and save it as <code>annotation_approved.csv</code> next to this file. If that file exists, the notebook uses it. This repository already includes ours. Clusters can come out a little different on another computer or with newer package versions. If yours don’t match ours, the notebook prints a note, uses the automatic guesses instead, and you review your own.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">file.exists</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)) {</span>
-<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>  annotation <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)</span>
-<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
-<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>  annotation <span class="ot">&lt;-</span> proposed</span>
-<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Labels belong to specific clusters. Stop if the approved file was made from different ones.</span></span>
-<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>sizes <span class="ot">&lt;-</span> <span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters)</span>
-<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">setequal</span>(<span class="fu">as.character</span>(annotation<span class="sc">$</span>cluster), <span class="fu">names</span>(sizes)) <span class="sc">||</span></span>
-<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">any</span>(annotation<span class="sc">$</span>n_cells <span class="sc">!=</span> sizes[<span class="fu">as.character</span>(annotation<span class="sc">$</span>cluster)])) {</span>
-<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">&quot;annotation_approved.csv does not match your clusters. Delete it, render again, and review results/annotation_proposed.csv.&quot;</span>)</span>
-<span id="cb49-11"><a href="#cb49-11" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb49-12"><a href="#cb49-12" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>celltype <span class="ot">&lt;-</span> annotation<span class="sc">$</span>celltype[<span class="fu">match</span>(obj<span class="sc">$</span>seurat_clusters, annotation<span class="sc">$</span>cluster)]</span>
-<span id="cb49-13"><a href="#cb49-13" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="sc">!</span><span class="fu">anyNA</span>(obj<span class="sc">$</span>celltype))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>annotation <span class="ot">&lt;-</span> proposed</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">file.exists</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)) {</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>  approved <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)</span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Labels belong to specific clusters. Only use the file if it was made from these clusters.</span></span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>  sizes <span class="ot">&lt;-</span> <span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters)</span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>  matches <span class="ot">&lt;-</span> <span class="fu">setequal</span>(<span class="fu">as.character</span>(approved<span class="sc">$</span>cluster), <span class="fu">names</span>(sizes)) <span class="sc">&amp;&amp;</span></span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">all</span>(approved<span class="sc">$</span>n_cells <span class="sc">==</span> sizes[<span class="fu">as.character</span>(approved<span class="sc">$</span>cluster)])</span>
+<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (matches) {</span>
+<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a>    annotation <span class="ot">&lt;-</span> approved</span>
+<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb49-11"><a href="#cb49-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="st">&quot;NOTE: annotation_approved.csv was made from different clusters than yours,</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb49-12"><a href="#cb49-12" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;so it was not used. The labels below are the automatic guesses.</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb49-13"><a href="#cb49-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;Review results/annotation_proposed.csv and save your own annotation_approved.csv.</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
+<span id="cb49-14"><a href="#cb49-14" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb49-15"><a href="#cb49-15" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb49-16"><a href="#cb49-16" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>celltype <span class="ot">&lt;-</span> annotation<span class="sc">$</span>celltype[<span class="fu">match</span>(obj<span class="sc">$</span>seurat_clusters, annotation<span class="sc">$</span>cluster)]</span>
+<span id="cb49-17"><a href="#cb49-17" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="sc">!</span><span class="fu">anyNA</span>(obj<span class="sc">$</span>celltype))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p>As a check, compare with the labels from the original paper.</p>
