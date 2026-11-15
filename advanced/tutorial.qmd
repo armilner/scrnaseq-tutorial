@@ -137,7 +137,7 @@ ElbowPlot(obj, ndims = 50)
 dims <- 1:params$npcs
 obj <- RunUMAP(obj, reduction = "pca", dims = dims, reduction.name = "umap.unint", verbose = FALSE)
 obj <- RunHarmony(obj, group.by.vars = "sample", reduction.use = "pca", dims.use = dims,
-                  assay.use = "SCT", reduction.save = "harmony", verbose = FALSE)
+                  reduction.save = "harmony", verbose = FALSE)
 obj <- RunUMAP(obj, reduction = "harmony", dims = dims, reduction.name = "umap", verbose = FALSE)
 DimPlot(obj, reduction = "umap.unint", group.by = "sample") + ggtitle("Unintegrated") |
   DimPlot(obj, reduction = "umap", group.by = "sample") + ggtitle("Harmony")

@@ -20,7 +20,7 @@ Suggested route: nf-core/fetchngs for SRP199727, then nf-core/scrnaseq with `--a
 ENGINE=apptainer ./run.sh render   # on HPC (run from this folder)
 ```
 
-Container: `ghcr.io/armilner/r-bioinformatics-2026`
+Container: `ghcr.io/armilner/r-bioinformatics-2027`
 
 ## Manual step
 

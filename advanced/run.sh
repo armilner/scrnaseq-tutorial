@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: ./run.sh check | render      (set ENGINE=apptainer on HPC)
 set -euo pipefail
-IMG="ghcr.io/armilner/r-bioinformatics-2026"
+IMG="ghcr.io/armilner/r-bioinformatics-2027"
 ENGINE="${ENGINE:-docker}"
 case "${1:-render}" in
   check)  CMD=(Rscript check_packages.R) ;;
