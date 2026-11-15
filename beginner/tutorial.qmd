@@ -108,7 +108,7 @@ In this experiment all control cells were run in one 10x lane and all treated ce
 **Which tool:** if you have the `raw_feature_bc_matrix` from Cell Ranger (all droplets, including empty ones), SoupX is the usual choice. This dataset only has the cells, with no empty droplets, so we use **decontX**. It works out the contamination from the cells alone.
 
 ```{r decontx}
-sce <- decontX(sce, batch = sce$stim)
+sce <- decontX(sce, batch = sce$stim, verbose = FALSE)
 
 # contamination per cell, from 0 (none) to 1 (all soup)
 summary(sce$decontX_contamination)
@@ -230,7 +230,7 @@ obj
 
 **Why:** without this, the biggest difference between cells would just be how deeply each one was sequenced.
 
-We then pick the 2,000 most variable genes. These carry most of the information about cell types, and using only them makes the next steps faster and less noisy. Scaling puts every gene on the same range so that very highly expressed genes don't dominate. PCA then squeezes those 2,000 genes into 30 summary dimensions.
+We then pick the 2,000 most variable genes. These carry most of the information about cell types, and using only them makes the next steps faster and less noisy. Scaling puts every gene on the same range so that very highly expressed genes don't dominate. PCA then squeezes those 2,000 genes into 50 summary dimensions, and we use the first 30.
 
 ```{r normalize}
 obj <- NormalizeData(obj)
@@ -286,6 +286,7 @@ Check that every cluster has cells from both conditions and from all donors. A c
 
 ```{r cluster-mix}
 table(obj$seurat_clusters, obj$stim)
+table(obj$seurat_clusters, obj$ind)
 ```
 
 ## 8. Find marker genes
@@ -464,7 +465,7 @@ de_summary <- de_all %>%
 de_summary
 ```
 
-Interferon is a strong signal, so expect many significant genes. Known interferon genes like ISG15, IFI6 and MX1 should be near the top.
+Interferon is a strong signal, so expect many significant genes. In CD14+ monocytes, interferon-induced genes such as CCL8, ISG20 and IFITM2 are in the top 10, and ISG15 is not far behind. Not every top gene is an interferon gene: ribosomal genes such as RPL7 go down.
 
 ```{r de-top}
 de_all %>% filter(celltype == de_summary$celltype[1]) %>% arrange(padj) %>% head(10)

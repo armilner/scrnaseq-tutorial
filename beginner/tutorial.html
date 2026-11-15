@@ -3252,7 +3252,7 @@ altExpNames(0):</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">decontX</span>(sce, <span class="at">batch =</span> sce<span class="sc">$</span>stim)</span>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">decontX</span>(sce, <span class="at">batch =</span> sce<span class="sc">$</span>stim, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># contamination per cell, from 0 (none) to 1 (all soup)</span></span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sce<span class="sc">$</span>decontX_contamination)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -3458,7 +3458,7 @@ Active assay: RNA (32938 features, 0 variable features)
 <h2 class="anchored" data-anchor-id="normalize">5. Normalize</h2>
 <p><strong>What:</strong> make cells comparable. Some cells were sequenced more deeply than others, so their counts are all higher. Normalizing divides each cell by its total, multiplies by 10,000, and takes the log.</p>
 <p><strong>Why:</strong> without this, the biggest difference between cells would just be how deeply each one was sequenced.</p>
-<p>We then pick the 2,000 most variable genes. These carry most of the information about cell types, and using only them makes the next steps faster and less noisy. Scaling puts every gene on the same range so that very highly expressed genes don’t dominate. PCA then squeezes those 2,000 genes into 30 summary dimensions.</p>
+<p>We then pick the 2,000 most variable genes. These carry most of the information about cell types, and using only them makes the next steps faster and less noisy. Scaling puts every gene on the same range so that very highly expressed genes don’t dominate. PCA then squeezes those 2,000 genes into 50 summary dimensions, and we use the first 30.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
@@ -3577,6 +3577,27 @@ Elapsed time: 2 seconds</code></pre>
   11  190  190
   12    6   35</code></pre>
 </div>
+<details open class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters, obj<span class="sc">$</span>ind)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>    
+      101  107 1015 1016 1039 1244 1256 1488
+  0   457  377 1538  731  272  680  772  687
+  1   181   90  350  250   86  630  829 1499
+  2   384  193  863  259  196  530  382  574
+  3   153   25  304 1077   42   81  261   85
+  4   193   77  642  207   53  137  332  385
+  5   145   80  338  166   36  198  417  252
+  6    14   14   59   51   59  460  382  147
+  7   180   43  315  167   37   57   94  166
+  8    84   31  112  176   61   69  132  164
+  9    33   18   65   64   22   71   89  111
+  10   61   31   65   42   15  100   60   76
+  11   33   20  115   21    8   52   65   66
+  12    8    1    2    4    8    1    6   11</code></pre>
+</div>
 </div>
 </section>
 <section id="find-marker-genes" class="level2">
@@ -3587,13 +3608,13 @@ Elapsed time: 2 seconds</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>obj <span class="ot">&lt;-</span> <span class="fu">JoinLayers</span>(obj)</span>
-<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>markers <span class="ot">&lt;-</span> <span class="fu">FindAllMarkers</span>(obj, <span class="at">only.pos =</span> <span class="cn">TRUE</span>, <span class="at">min.pct =</span> <span class="fl">0.25</span>, <span class="at">logfc.threshold =</span> <span class="fl">0.5</span>)</span>
-<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(markers, <span class="st">&quot;results/cluster_markers.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a><span class="co"># top 5 per cluster</span></span>
-<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>top5 <span class="ot">&lt;-</span> markers <span class="sc">%&gt;%</span> <span class="fu">group_by</span>(cluster) <span class="sc">%&gt;%</span> <span class="fu">slice_max</span>(avg_log2FC, <span class="at">n =</span> <span class="dv">5</span>)</span>
-<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>top5</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>obj <span class="ot">&lt;-</span> <span class="fu">JoinLayers</span>(obj)</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>markers <span class="ot">&lt;-</span> <span class="fu">FindAllMarkers</span>(obj, <span class="at">only.pos =</span> <span class="cn">TRUE</span>, <span class="at">min.pct =</span> <span class="fl">0.25</span>, <span class="at">logfc.threshold =</span> <span class="fl">0.5</span>)</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(markers, <span class="st">&quot;results/cluster_markers.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a><span class="co"># top 5 per cluster</span></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>top5 <span class="ot">&lt;-</span> markers <span class="sc">%&gt;%</span> <span class="fu">group_by</span>(cluster) <span class="sc">%&gt;%</span> <span class="fu">slice_max</span>(avg_log2FC, <span class="at">n =</span> <span class="dv">5</span>)</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>top5</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 65 × 7
@@ -3617,10 +3638,10 @@ Elapsed time: 2 seconds</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>known_markers <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;CD3E&quot;</span>, <span class="st">&quot;IL7R&quot;</span>, <span class="st">&quot;CCR7&quot;</span>, <span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;GNLY&quot;</span>, <span class="st">&quot;NKG7&quot;</span>,</span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD79A&quot;</span>, <span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;FCGR3A&quot;</span>,</span>
-<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;FCER1A&quot;</span>, <span class="st">&quot;CST3&quot;</span>, <span class="st">&quot;PPBP&quot;</span>)</span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="fu">DotPlot</span>(obj, <span class="at">features =</span> known_markers) <span class="sc">+</span> <span class="fu">RotatedAxis</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>known_markers <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;CD3E&quot;</span>, <span class="st">&quot;IL7R&quot;</span>, <span class="st">&quot;CCR7&quot;</span>, <span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;GNLY&quot;</span>, <span class="st">&quot;NKG7&quot;</span>,</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD79A&quot;</span>, <span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;FCGR3A&quot;</span>,</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;FCER1A&quot;</span>, <span class="st">&quot;CST3&quot;</span>, <span class="st">&quot;PPBP&quot;</span>)</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a><span class="fu">DotPlot</span>(obj, <span class="at">features =</span> known_markers) <span class="sc">+</span> <span class="fu">RotatedAxis</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output-display">
 <div>
@@ -3640,42 +3661,42 @@ Elapsed time: 2 seconds</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>cell_type_markers <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD14+ Monocytes&quot;</span>   <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;S100A8&quot;</span>, <span class="st">&quot;S100A9&quot;</span>),</span>
-<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;FCGR3A+ Monocytes&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;FCGR3A&quot;</span>, <span class="st">&quot;MS4A7&quot;</span>),</span>
-<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD4+ T cells&quot;</span>      <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;CD3D&quot;</span>, <span class="st">&quot;IL7R&quot;</span>),</span>
-<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD8+ T cells&quot;</span>      <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;CD8B&quot;</span>),</span>
-<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;NK cells&quot;</span>          <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;GNLY&quot;</span>, <span class="st">&quot;NKG7&quot;</span>, <span class="st">&quot;KLRF1&quot;</span>),</span>
-<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;B cells&quot;</span>           <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD79A&quot;</span>),</span>
-<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Dendritic cells&quot;</span>   <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;FCER1A&quot;</span>, <span class="st">&quot;CD1C&quot;</span>),</span>
-<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;pDC&quot;</span>               <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;LILRA4&quot;</span>, <span class="st">&quot;CLEC4C&quot;</span>),</span>
-<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Megakaryocytes&quot;</span>    <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;PPBP&quot;</span>, <span class="st">&quot;PF4&quot;</span>)</span>
-<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a>obj <span class="ot">&lt;-</span> <span class="fu">AddModuleScore</span>(obj, <span class="at">features =</span> cell_type_markers, <span class="at">name =</span> <span class="st">&quot;score&quot;</span>)</span>
-<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-15"><a href="#cb43-15" aria-hidden="true" tabindex="-1"></a><span class="co"># the scores are saved as score1, score2, ... in the same order as the list</span></span>
-<span id="cb43-16"><a href="#cb43-16" aria-hidden="true" tabindex="-1"></a>scores <span class="ot">&lt;-</span> obj<span class="sc">@</span>meta.data[, <span class="fu">paste0</span>(<span class="st">&quot;score&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(cell_type_markers))]</span>
-<span id="cb43-17"><a href="#cb43-17" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(scores) <span class="ot">&lt;-</span> <span class="fu">names</span>(cell_type_markers)</span>
-<span id="cb43-18"><a href="#cb43-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-19"><a href="#cb43-19" aria-hidden="true" tabindex="-1"></a><span class="co"># each cell gets the name with the highest score</span></span>
-<span id="cb43-20"><a href="#cb43-20" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>marker_guess <span class="ot">&lt;-</span> <span class="fu">colnames</span>(scores)[<span class="fu">apply</span>(scores, <span class="dv">1</span>, which.max)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>cell_type_markers <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD14+ Monocytes&quot;</span>   <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;S100A8&quot;</span>, <span class="st">&quot;S100A9&quot;</span>),</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;FCGR3A+ Monocytes&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;FCGR3A&quot;</span>, <span class="st">&quot;MS4A7&quot;</span>),</span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD4+ T cells&quot;</span>      <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;CD3D&quot;</span>, <span class="st">&quot;IL7R&quot;</span>),</span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD8+ T cells&quot;</span>      <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;CD8B&quot;</span>),</span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;NK cells&quot;</span>          <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;GNLY&quot;</span>, <span class="st">&quot;NKG7&quot;</span>, <span class="st">&quot;KLRF1&quot;</span>),</span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;B cells&quot;</span>           <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD79A&quot;</span>),</span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Dendritic cells&quot;</span>   <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;FCER1A&quot;</span>, <span class="st">&quot;CD1C&quot;</span>),</span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;pDC&quot;</span>               <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;LILRA4&quot;</span>, <span class="st">&quot;CLEC4C&quot;</span>),</span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Megakaryocytes&quot;</span>    <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;PPBP&quot;</span>, <span class="st">&quot;PF4&quot;</span>)</span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a>obj <span class="ot">&lt;-</span> <span class="fu">AddModuleScore</span>(obj, <span class="at">features =</span> cell_type_markers, <span class="at">name =</span> <span class="st">&quot;score&quot;</span>)</span>
+<span id="cb45-14"><a href="#cb45-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a><span class="co"># the scores are saved as score1, score2, ... in the same order as the list</span></span>
+<span id="cb45-16"><a href="#cb45-16" aria-hidden="true" tabindex="-1"></a>scores <span class="ot">&lt;-</span> obj<span class="sc">@</span>meta.data[, <span class="fu">paste0</span>(<span class="st">&quot;score&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(cell_type_markers))]</span>
+<span id="cb45-17"><a href="#cb45-17" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(scores) <span class="ot">&lt;-</span> <span class="fu">names</span>(cell_type_markers)</span>
+<span id="cb45-18"><a href="#cb45-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-19"><a href="#cb45-19" aria-hidden="true" tabindex="-1"></a><span class="co"># each cell gets the name with the highest score</span></span>
+<span id="cb45-20"><a href="#cb45-20" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>marker_guess <span class="ot">&lt;-</span> <span class="fu">colnames</span>(scores)[<span class="fu">apply</span>(scores, <span class="dv">1</span>, which.max)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p>Now take the most common guess in each cluster.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>label_table <span class="ot">&lt;-</span> <span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters, obj<span class="sc">$</span>marker_guess)</span>
-<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>proposed <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">cluster      =</span> <span class="fu">rownames</span>(label_table),</span>
-<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_cells      =</span> <span class="fu">rowSums</span>(label_table),</span>
-<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">marker_guess =</span> <span class="fu">colnames</span>(label_table)[<span class="fu">apply</span>(label_table, <span class="dv">1</span>, which.max)],</span>
-<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">agreement    =</span> <span class="fu">round</span>(<span class="fu">apply</span>(label_table, <span class="dv">1</span>, max) <span class="sc">/</span> <span class="fu">rowSums</span>(label_table), <span class="dv">2</span>)</span>
-<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>proposed<span class="sc">$</span>celltype <span class="ot">&lt;-</span> proposed<span class="sc">$</span>marker_guess</span>
-<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>proposed</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>label_table <span class="ot">&lt;-</span> <span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters, obj<span class="sc">$</span>marker_guess)</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>proposed <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">cluster      =</span> <span class="fu">rownames</span>(label_table),</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_cells      =</span> <span class="fu">rowSums</span>(label_table),</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">marker_guess =</span> <span class="fu">colnames</span>(label_table)[<span class="fu">apply</span>(label_table, <span class="dv">1</span>, which.max)],</span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">agreement    =</span> <span class="fu">round</span>(<span class="fu">apply</span>(label_table, <span class="dv">1</span>, max) <span class="sc">/</span> <span class="fu">rowSums</span>(label_table), <span class="dv">2</span>)</span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a>proposed<span class="sc">$</span>celltype <span class="ot">&lt;-</span> proposed<span class="sc">$</span>marker_guess</span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a>proposed</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>   cluster n_cells      marker_guess agreement          celltype
@@ -3695,29 +3716,36 @@ Elapsed time: 2 seconds</code></pre>
 </div>
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(proposed, <span class="st">&quot;results/annotation_proposed.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(proposed, <span class="st">&quot;results/annotation_proposed.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p><code>agreement</code> is the share of cells in the cluster with that guess. Low agreement means the cluster is mixed or the marker lists don’t separate it well, so check the dot plot and the top markers from step 8.</p>
 <p>An automatic guess is only as good as its marker lists. A cluster with markers that aren’t on any list, for example stressed cells with high heat-shock genes, still gets the closest name. That is why a person checks every label.</p>
 <p>There are other ways to make the automatic guess. Reference-based tools such as SingleR or Azimuth compare your cells to a labelled dataset. They need extra packages and a reference download, and they make mistakes too.</p>
-<p><strong>Your turn.</strong> Open <code>results/annotation_proposed.csv</code>, check each label against the dot plot and markers, change the <code>celltype</code> column if needed, and save it as <code>annotation_approved.csv</code> next to this file. If that file exists, the notebook uses it.</p>
+<p><strong>Your turn.</strong> Open <code>results/annotation_proposed.csv</code>, check each label against the dot plot and markers, change the <code>celltype</code> column if needed, and save it as <code>annotation_approved.csv</code> next to this file. If that file exists, the notebook uses it. This repository already includes ours. If your clusters come out different (for example with newer package versions), the notebook stops and tells you to delete it and review your own.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">file.exists</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)) {</span>
-<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>  annotation <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)</span>
-<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
-<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>  annotation <span class="ot">&lt;-</span> proposed</span>
-<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>celltype <span class="ot">&lt;-</span> annotation<span class="sc">$</span>celltype[<span class="fu">match</span>(obj<span class="sc">$</span>seurat_clusters, annotation<span class="sc">$</span>cluster)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">file.exists</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)) {</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>  annotation <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>  annotation <span class="ot">&lt;-</span> proposed</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Labels belong to specific clusters. Stop if the approved file was made from different ones.</span></span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>sizes <span class="ot">&lt;-</span> <span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters)</span>
+<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">setequal</span>(<span class="fu">as.character</span>(annotation<span class="sc">$</span>cluster), <span class="fu">names</span>(sizes)) <span class="sc">||</span></span>
+<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">any</span>(annotation<span class="sc">$</span>n_cells <span class="sc">!=</span> sizes[<span class="fu">as.character</span>(annotation<span class="sc">$</span>cluster)])) {</span>
+<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">&quot;annotation_approved.csv does not match your clusters. Delete it, render again, and review results/annotation_proposed.csv.&quot;</span>)</span>
+<span id="cb49-11"><a href="#cb49-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb49-12"><a href="#cb49-12" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>celltype <span class="ot">&lt;-</span> annotation<span class="sc">$</span>celltype[<span class="fu">match</span>(obj<span class="sc">$</span>seurat_clusters, annotation<span class="sc">$</span>cluster)]</span>
+<span id="cb49-13"><a href="#cb49-13" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="sc">!</span><span class="fu">anyNA</span>(obj<span class="sc">$</span>celltype))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p>As a check, compare with the labels from the original paper.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(<span class="at">ours =</span> obj<span class="sc">$</span>celltype, <span class="at">paper =</span> obj<span class="sc">$</span>cell)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(<span class="at">ours =</span> obj<span class="sc">$</span>celltype, <span class="at">paper =</span> obj<span class="sc">$</span>cell)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>                   paper
@@ -3747,8 +3775,8 @@ ours                Dendritic cells FCGR3A+ Monocytes Megakaryocytes NK cells
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(obj, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;celltype&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
-<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">DimPlot</span>(obj, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(obj, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;celltype&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">DimPlot</span>(obj, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output-display">
 <div>
@@ -3768,64 +3796,64 @@ ours                Dendritic cells FCGR3A+ Monocytes Megakaryocytes NK cells
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>celltypes <span class="ot">&lt;-</span> <span class="fu">unique</span>(obj<span class="sc">$</span>celltype)</span>
-<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>de_results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (ct <span class="cf">in</span> celltypes) {</span>
-<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>  cells <span class="ot">&lt;-</span> <span class="fu">subset</span>(obj, <span class="at">subset =</span> celltype <span class="sc">==</span> ct)</span>
-<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># only use samples with at least 10 cells of this type</span></span>
-<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a>  cell_counts <span class="ot">&lt;-</span> <span class="fu">table</span>(cells<span class="sc">$</span>sample)</span>
-<span id="cb51-9"><a href="#cb51-9" aria-hidden="true" tabindex="-1"></a>  keep_samples <span class="ot">&lt;-</span> <span class="fu">names</span>(cell_counts)[cell_counts <span class="sc">&gt;=</span> <span class="dv">10</span>]</span>
-<span id="cb51-10"><a href="#cb51-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-11"><a href="#cb51-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># need at least 2 samples in each condition, or there is nothing to compare</span></span>
-<span id="cb51-12"><a href="#cb51-12" aria-hidden="true" tabindex="-1"></a>  n_ctrl <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">grepl</span>(<span class="st">&quot;-ctrl$&quot;</span>, keep_samples))</span>
-<span id="cb51-13"><a href="#cb51-13" aria-hidden="true" tabindex="-1"></a>  n_stim <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">grepl</span>(<span class="st">&quot;-stim$&quot;</span>, keep_samples))</span>
-<span id="cb51-14"><a href="#cb51-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (n_ctrl <span class="sc">&lt;</span> <span class="dv">2</span> <span class="sc">|</span> n_stim <span class="sc">&lt;</span> <span class="dv">2</span>) {</span>
-<span id="cb51-15"><a href="#cb51-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="fu">paste0</span>(<span class="st">&quot;Skipping &quot;</span>, ct, <span class="st">&quot;: only &quot;</span>, n_ctrl, <span class="st">&quot; control and &quot;</span>, n_stim,</span>
-<span id="cb51-16"><a href="#cb51-16" aria-hidden="true" tabindex="-1"></a>               <span class="st">&quot; treated samples have 10 or more cells.</span><span class="sc">\n</span><span class="st">&quot;</span>))</span>
-<span id="cb51-17"><a href="#cb51-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">next</span></span>
-<span id="cb51-18"><a href="#cb51-18" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb51-19"><a href="#cb51-19" aria-hidden="true" tabindex="-1"></a>  cells <span class="ot">&lt;-</span> <span class="fu">subset</span>(cells, <span class="at">subset =</span> sample <span class="sc">%in%</span> keep_samples)</span>
-<span id="cb51-20"><a href="#cb51-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-21"><a href="#cb51-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># add up counts per sample</span></span>
-<span id="cb51-22"><a href="#cb51-22" aria-hidden="true" tabindex="-1"></a>  pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(cells, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;sample&quot;</span>)<span class="sc">$</span>RNA</span>
-<span id="cb51-23"><a href="#cb51-23" aria-hidden="true" tabindex="-1"></a>  pb <span class="ot">&lt;-</span> <span class="fu">round</span>(<span class="fu">as.matrix</span>(pb))</span>
-<span id="cb51-24"><a href="#cb51-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-25"><a href="#cb51-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># sample table: which person and condition each column is</span></span>
-<span id="cb51-26"><a href="#cb51-26" aria-hidden="true" tabindex="-1"></a>  info <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">sample =</span> <span class="fu">colnames</span>(pb))</span>
-<span id="cb51-27"><a href="#cb51-27" aria-hidden="true" tabindex="-1"></a>  info<span class="sc">$</span>ind  <span class="ot">&lt;-</span> <span class="fu">factor</span>(cells<span class="sc">$</span>ind[<span class="fu">match</span>(info<span class="sc">$</span>sample, cells<span class="sc">$</span>sample)])</span>
-<span id="cb51-28"><a href="#cb51-28" aria-hidden="true" tabindex="-1"></a>  info<span class="sc">$</span>stim <span class="ot">&lt;-</span> <span class="fu">factor</span>(cells<span class="sc">$</span>stim[<span class="fu">match</span>(info<span class="sc">$</span>sample, cells<span class="sc">$</span>sample)], <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;ctrl&quot;</span>, <span class="st">&quot;stim&quot;</span>))</span>
-<span id="cb51-29"><a href="#cb51-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-30"><a href="#cb51-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># drop genes with almost no counts</span></span>
-<span id="cb51-31"><a href="#cb51-31" aria-hidden="true" tabindex="-1"></a>  pb <span class="ot">&lt;-</span> pb[<span class="fu">rowSums</span>(pb <span class="sc">&gt;=</span> <span class="dv">10</span>) <span class="sc">&gt;=</span> <span class="dv">2</span>, ]</span>
-<span id="cb51-32"><a href="#cb51-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-33"><a href="#cb51-33" aria-hidden="true" tabindex="-1"></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(pb, <span class="at">colData =</span> info, <span class="at">design =</span> <span class="sc">~</span> ind <span class="sc">+</span> stim)</span>
-<span id="cb51-34"><a href="#cb51-34" aria-hidden="true" tabindex="-1"></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds, <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb51-35"><a href="#cb51-35" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;stim&quot;</span>, <span class="st">&quot;stim&quot;</span>, <span class="st">&quot;ctrl&quot;</span>)))</span>
-<span id="cb51-36"><a href="#cb51-36" aria-hidden="true" tabindex="-1"></a>  res<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">rownames</span>(res)</span>
-<span id="cb51-37"><a href="#cb51-37" aria-hidden="true" tabindex="-1"></a>  res<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ct</span>
-<span id="cb51-38"><a href="#cb51-38" aria-hidden="true" tabindex="-1"></a>  de_results[[ct]] <span class="ot">&lt;-</span> res</span>
-<span id="cb51-39"><a href="#cb51-39" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>celltypes <span class="ot">&lt;-</span> <span class="fu">unique</span>(obj<span class="sc">$</span>celltype)</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>de_results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (ct <span class="cf">in</span> celltypes) {</span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>  cells <span class="ot">&lt;-</span> <span class="fu">subset</span>(obj, <span class="at">subset =</span> celltype <span class="sc">==</span> ct)</span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># only use samples with at least 10 cells of this type</span></span>
+<span id="cb53-8"><a href="#cb53-8" aria-hidden="true" tabindex="-1"></a>  cell_counts <span class="ot">&lt;-</span> <span class="fu">table</span>(cells<span class="sc">$</span>sample)</span>
+<span id="cb53-9"><a href="#cb53-9" aria-hidden="true" tabindex="-1"></a>  keep_samples <span class="ot">&lt;-</span> <span class="fu">names</span>(cell_counts)[cell_counts <span class="sc">&gt;=</span> <span class="dv">10</span>]</span>
+<span id="cb53-10"><a href="#cb53-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-11"><a href="#cb53-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># need at least 2 samples in each condition, or there is nothing to compare</span></span>
+<span id="cb53-12"><a href="#cb53-12" aria-hidden="true" tabindex="-1"></a>  n_ctrl <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">grepl</span>(<span class="st">&quot;-ctrl$&quot;</span>, keep_samples))</span>
+<span id="cb53-13"><a href="#cb53-13" aria-hidden="true" tabindex="-1"></a>  n_stim <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">grepl</span>(<span class="st">&quot;-stim$&quot;</span>, keep_samples))</span>
+<span id="cb53-14"><a href="#cb53-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (n_ctrl <span class="sc">&lt;</span> <span class="dv">2</span> <span class="sc">|</span> n_stim <span class="sc">&lt;</span> <span class="dv">2</span>) {</span>
+<span id="cb53-15"><a href="#cb53-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="fu">paste0</span>(<span class="st">&quot;Skipping &quot;</span>, ct, <span class="st">&quot;: only &quot;</span>, n_ctrl, <span class="st">&quot; control and &quot;</span>, n_stim,</span>
+<span id="cb53-16"><a href="#cb53-16" aria-hidden="true" tabindex="-1"></a>               <span class="st">&quot; treated samples have 10 or more cells.</span><span class="sc">\n</span><span class="st">&quot;</span>))</span>
+<span id="cb53-17"><a href="#cb53-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">next</span></span>
+<span id="cb53-18"><a href="#cb53-18" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb53-19"><a href="#cb53-19" aria-hidden="true" tabindex="-1"></a>  cells <span class="ot">&lt;-</span> <span class="fu">subset</span>(cells, <span class="at">subset =</span> sample <span class="sc">%in%</span> keep_samples)</span>
+<span id="cb53-20"><a href="#cb53-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-21"><a href="#cb53-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># add up counts per sample</span></span>
+<span id="cb53-22"><a href="#cb53-22" aria-hidden="true" tabindex="-1"></a>  pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(cells, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;sample&quot;</span>)<span class="sc">$</span>RNA</span>
+<span id="cb53-23"><a href="#cb53-23" aria-hidden="true" tabindex="-1"></a>  pb <span class="ot">&lt;-</span> <span class="fu">round</span>(<span class="fu">as.matrix</span>(pb))</span>
+<span id="cb53-24"><a href="#cb53-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-25"><a href="#cb53-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># sample table: which person and condition each column is</span></span>
+<span id="cb53-26"><a href="#cb53-26" aria-hidden="true" tabindex="-1"></a>  info <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">sample =</span> <span class="fu">colnames</span>(pb))</span>
+<span id="cb53-27"><a href="#cb53-27" aria-hidden="true" tabindex="-1"></a>  info<span class="sc">$</span>ind  <span class="ot">&lt;-</span> <span class="fu">factor</span>(cells<span class="sc">$</span>ind[<span class="fu">match</span>(info<span class="sc">$</span>sample, cells<span class="sc">$</span>sample)])</span>
+<span id="cb53-28"><a href="#cb53-28" aria-hidden="true" tabindex="-1"></a>  info<span class="sc">$</span>stim <span class="ot">&lt;-</span> <span class="fu">factor</span>(cells<span class="sc">$</span>stim[<span class="fu">match</span>(info<span class="sc">$</span>sample, cells<span class="sc">$</span>sample)], <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;ctrl&quot;</span>, <span class="st">&quot;stim&quot;</span>))</span>
+<span id="cb53-29"><a href="#cb53-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-30"><a href="#cb53-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># drop genes with almost no counts</span></span>
+<span id="cb53-31"><a href="#cb53-31" aria-hidden="true" tabindex="-1"></a>  pb <span class="ot">&lt;-</span> pb[<span class="fu">rowSums</span>(pb <span class="sc">&gt;=</span> <span class="dv">10</span>) <span class="sc">&gt;=</span> <span class="dv">2</span>, ]</span>
+<span id="cb53-32"><a href="#cb53-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-33"><a href="#cb53-33" aria-hidden="true" tabindex="-1"></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(pb, <span class="at">colData =</span> info, <span class="at">design =</span> <span class="sc">~</span> ind <span class="sc">+</span> stim)</span>
+<span id="cb53-34"><a href="#cb53-34" aria-hidden="true" tabindex="-1"></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds, <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb53-35"><a href="#cb53-35" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;stim&quot;</span>, <span class="st">&quot;stim&quot;</span>, <span class="st">&quot;ctrl&quot;</span>)))</span>
+<span id="cb53-36"><a href="#cb53-36" aria-hidden="true" tabindex="-1"></a>  res<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">rownames</span>(res)</span>
+<span id="cb53-37"><a href="#cb53-37" aria-hidden="true" tabindex="-1"></a>  res<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ct</span>
+<span id="cb53-38"><a href="#cb53-38" aria-hidden="true" tabindex="-1"></a>  de_results[[ct]] <span class="ot">&lt;-</span> res</span>
+<span id="cb53-39"><a href="#cb53-39" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Skipping pDC: only 0 control and 0 treated samples have 10 or more cells.</code></pre>
 </div>
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>de_all <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(de_results)</span>
-<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(de_all, <span class="st">&quot;results/pseudobulk_DE.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>de_all <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(de_results)</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(de_all, <span class="st">&quot;results/pseudobulk_DE.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p>How many genes change in each cell type (adjusted p-value under 0.05):</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>de_summary <span class="ot">&lt;-</span> de_all <span class="sc">%&gt;%</span></span>
-<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(celltype) <span class="sc">%&gt;%</span></span>
-<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">genes_tested =</span> <span class="fu">n</span>(), <span class="at">significant =</span> <span class="fu">sum</span>(padj <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(significant))</span>
-<span id="cb54-5"><a href="#cb54-5" aria-hidden="true" tabindex="-1"></a>de_summary</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>de_summary <span class="ot">&lt;-</span> de_all <span class="sc">%&gt;%</span></span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(celltype) <span class="sc">%&gt;%</span></span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">genes_tested =</span> <span class="fu">n</span>(), <span class="at">significant =</span> <span class="fu">sum</span>(padj <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(significant))</span>
+<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a>de_summary</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 8 × 3
@@ -3841,11 +3869,11 @@ ours                Dendritic cells FCGR3A+ Monocytes Megakaryocytes NK cells
 8 Megakaryocytes             875         113</code></pre>
 </div>
 </div>
-<p>Interferon is a strong signal, so expect many significant genes. Known interferon genes like ISG15, IFI6 and MX1 should be near the top.</p>
+<p>Interferon is a strong signal, so expect many significant genes. In CD14+ monocytes, interferon-induced genes such as CCL8, ISG20 and IFITM2 are in the top 10, and ISG15 is not far behind. Not every top gene is an interferon gene: ribosomal genes such as RPL7 go down.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>de_all <span class="sc">%&gt;%</span> <span class="fu">filter</span>(celltype <span class="sc">==</span> de_summary<span class="sc">$</span>celltype[<span class="dv">1</span>]) <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(padj) <span class="sc">%&gt;%</span> <span class="fu">head</span>(<span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>de_all <span class="sc">%&gt;%</span> <span class="fu">filter</span>(celltype <span class="sc">==</span> de_summary<span class="sc">$</span>celltype[<span class="dv">1</span>]) <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(padj) <span class="sc">%&gt;%</span> <span class="fu">head</span>(<span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>        baseMean log2FoldChange      lfcSE      stat        pvalue
@@ -3882,11 +3910,11 @@ NT5C3A 5.081882e-113 NT5C3A CD14+ Monocytes</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>hallmark <span class="ot">&lt;-</span> <span class="fu">msigdbr</span>(<span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">collection =</span> <span class="st">&quot;H&quot;</span>)</span>
-<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>reactome <span class="ot">&lt;-</span> <span class="fu">msigdbr</span>(<span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">collection =</span> <span class="st">&quot;C2&quot;</span>, <span class="at">subcollection =</span> <span class="st">&quot;CP:REACTOME&quot;</span>)</span>
-<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>genesets <span class="ot">&lt;-</span> <span class="fu">rbind</span>(hallmark, reactome)</span>
-<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a>genesets <span class="ot">&lt;-</span> <span class="fu">split</span>(genesets<span class="sc">$</span>gene_symbol, genesets<span class="sc">$</span>gs_name)</span>
-<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(genesets)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>hallmark <span class="ot">&lt;-</span> <span class="fu">msigdbr</span>(<span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">collection =</span> <span class="st">&quot;H&quot;</span>)</span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>reactome <span class="ot">&lt;-</span> <span class="fu">msigdbr</span>(<span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">collection =</span> <span class="st">&quot;C2&quot;</span>, <span class="at">subcollection =</span> <span class="st">&quot;CP:REACTOME&quot;</span>)</span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>genesets <span class="ot">&lt;-</span> <span class="fu">rbind</span>(hallmark, reactome)</span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>genesets <span class="ot">&lt;-</span> <span class="fu">split</span>(genesets<span class="sc">$</span>gene_symbol, genesets<span class="sc">$</span>gs_name)</span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(genesets)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 1889</code></pre>
@@ -3895,38 +3923,38 @@ NT5C3A 5.081882e-113 NT5C3A CD14+ Monocytes</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>gsea_results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (ct <span class="cf">in</span> <span class="fu">names</span>(de_results)) {</span>
-<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> de_results[[ct]]</span>
-<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> res[<span class="sc">!</span><span class="fu">is.na</span>(res<span class="sc">$</span>stat), ]</span>
-<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a>  ranks <span class="ot">&lt;-</span> res<span class="sc">$</span>stat</span>
-<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">names</span>(ranks) <span class="ot">&lt;-</span> res<span class="sc">$</span>gene</span>
-<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a>  ranks <span class="ot">&lt;-</span> <span class="fu">sort</span>(ranks, <span class="at">decreasing =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb60-11"><a href="#cb60-11" aria-hidden="true" tabindex="-1"></a>  gs <span class="ot">&lt;-</span> <span class="fu">fgsea</span>(genesets, ranks, <span class="at">minSize =</span> <span class="dv">15</span>, <span class="at">maxSize =</span> <span class="dv">500</span>)</span>
-<span id="cb60-12"><a href="#cb60-12" aria-hidden="true" tabindex="-1"></a>  gs<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ct</span>
-<span id="cb60-13"><a href="#cb60-13" aria-hidden="true" tabindex="-1"></a>  gsea_results[[ct]] <span class="ot">&lt;-</span> gs</span>
-<span id="cb60-14"><a href="#cb60-14" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb60-15"><a href="#cb60-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb60-16"><a href="#cb60-16" aria-hidden="true" tabindex="-1"></a>gsea_all <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(gsea_results)</span>
-<span id="cb60-17"><a href="#cb60-17" aria-hidden="true" tabindex="-1"></a>gsea_all<span class="sc">$</span>leadingEdge <span class="ot">&lt;-</span> <span class="fu">sapply</span>(gsea_all<span class="sc">$</span>leadingEdge, paste, <span class="at">collapse =</span> <span class="st">&quot;;&quot;</span>)</span>
-<span id="cb60-18"><a href="#cb60-18" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(gsea_all, <span class="st">&quot;results/gsea.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>gsea_results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (ct <span class="cf">in</span> <span class="fu">names</span>(de_results)) {</span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> de_results[[ct]]</span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> res[<span class="sc">!</span><span class="fu">is.na</span>(res<span class="sc">$</span>stat), ]</span>
+<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-7"><a href="#cb62-7" aria-hidden="true" tabindex="-1"></a>  ranks <span class="ot">&lt;-</span> res<span class="sc">$</span>stat</span>
+<span id="cb62-8"><a href="#cb62-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">names</span>(ranks) <span class="ot">&lt;-</span> res<span class="sc">$</span>gene</span>
+<span id="cb62-9"><a href="#cb62-9" aria-hidden="true" tabindex="-1"></a>  ranks <span class="ot">&lt;-</span> <span class="fu">sort</span>(ranks, <span class="at">decreasing =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb62-10"><a href="#cb62-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-11"><a href="#cb62-11" aria-hidden="true" tabindex="-1"></a>  gs <span class="ot">&lt;-</span> <span class="fu">fgsea</span>(genesets, ranks, <span class="at">minSize =</span> <span class="dv">15</span>, <span class="at">maxSize =</span> <span class="dv">500</span>)</span>
+<span id="cb62-12"><a href="#cb62-12" aria-hidden="true" tabindex="-1"></a>  gs<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ct</span>
+<span id="cb62-13"><a href="#cb62-13" aria-hidden="true" tabindex="-1"></a>  gsea_results[[ct]] <span class="ot">&lt;-</span> gs</span>
+<span id="cb62-14"><a href="#cb62-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb62-15"><a href="#cb62-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-16"><a href="#cb62-16" aria-hidden="true" tabindex="-1"></a>gsea_all <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(gsea_results)</span>
+<span id="cb62-17"><a href="#cb62-17" aria-hidden="true" tabindex="-1"></a>gsea_all<span class="sc">$</span>leadingEdge <span class="ot">&lt;-</span> <span class="fu">sapply</span>(gsea_all<span class="sc">$</span>leadingEdge, paste, <span class="at">collapse =</span> <span class="st">&quot;;&quot;</span>)</span>
+<span id="cb62-18"><a href="#cb62-18" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(gsea_all, <span class="st">&quot;results/gsea.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p>Top pathways for the cell type with the most significant genes. Positive NES means the pathway goes up with interferon.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb61"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>top_ct <span class="ot">&lt;-</span> de_summary<span class="sc">$</span>celltype[<span class="dv">1</span>]</span>
-<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>top_paths <span class="ot">&lt;-</span> gsea_all <span class="sc">%&gt;%</span> <span class="fu">filter</span>(celltype <span class="sc">==</span> top_ct) <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(padj) <span class="sc">%&gt;%</span> <span class="fu">head</span>(<span class="dv">20</span>)</span>
-<span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(top_paths, <span class="fu">aes</span>(NES, <span class="fu">reorder</span>(pathway, NES), <span class="at">fill =</span> padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)) <span class="sc">+</span></span>
-<span id="cb61-5"><a href="#cb61-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
-<span id="cb61-6"><a href="#cb61-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="fu">paste</span>(<span class="st">&quot;Top pathways, stim vs ctrl:&quot;</span>, top_ct)) <span class="sc">+</span></span>
-<span id="cb61-7"><a href="#cb61-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>() <span class="sc">+</span></span>
-<span id="cb61-8"><a href="#cb61-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">7</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb63"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a>top_ct <span class="ot">&lt;-</span> de_summary<span class="sc">$</span>celltype[<span class="dv">1</span>]</span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>top_paths <span class="ot">&lt;-</span> gsea_all <span class="sc">%&gt;%</span> <span class="fu">filter</span>(celltype <span class="sc">==</span> top_ct) <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(padj) <span class="sc">%&gt;%</span> <span class="fu">head</span>(<span class="dv">20</span>)</span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(top_paths, <span class="fu">aes</span>(NES, <span class="fu">reorder</span>(pathway, NES), <span class="at">fill =</span> padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)) <span class="sc">+</span></span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="fu">paste</span>(<span class="st">&quot;Top pathways, stim vs ctrl:&quot;</span>, top_ct)) <span class="sc">+</span></span>
+<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>() <span class="sc">+</span></span>
+<span id="cb63-8"><a href="#cb63-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">7</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output-display">
 <div>
@@ -3943,8 +3971,8 @@ NT5C3A 5.081882e-113 NT5C3A CD14+ Monocytes</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(obj, <span class="st">&quot;results/pbmc_ifnb_annotated.rds&quot;</span>)</span>
-<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(obj, <span class="st">&quot;results/pbmc_ifnb_annotated.rds&quot;</span>)</span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>R version 4.4.2 (2024-10-31)
@@ -3958,7 +3986,7 @@ LAPACK: /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlap
 locale:
 [1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8
 
-time zone: America/New_York
+time zone: America/Chicago
 tzcode source: internal
 
 attached base packages:
