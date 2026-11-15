@@ -2404,7 +2404,7 @@ Active assay: RNA (38606 features, 0 variable features)
 </section>
 <section id="normalization" class="level2">
 <h2 class="anchored" data-anchor-id="normalization">4. Normalization</h2>
-<p><strong>Decision:</strong> which normalization feeds which step. <strong>Default:</strong> SCTransform per sample for PCA, clustering and UMAP; log-normalized RNA for marker tests and plots; raw counts for pseudobulk. <strong>Deviate:</strong> log-normalization throughout is a valid simpler choice and usually gives very similar clusters.</p>
+<p><strong>Decision:</strong> which normalization feeds which step. <strong>Default:</strong> SCTransform per sample for PCA, clustering and UMAP; log-normalized RNA for marker tests and plots; ambient-corrected counts for pseudobulk. <strong>Deviate:</strong> log-normalization throughout is a valid simpler choice and usually gives very similar clusters.</p>
 <p>After <code>merge</code>, each sample is its own layer, so SCTransform fits one model per sample.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -2424,7 +2424,7 @@ Active assay: RNA (38606 features, 0 variable features)
 </section>
 <section id="integration" class="level2">
 <h2 class="anchored" data-anchor-id="integration">5. Integration</h2>
-<p><strong>Decision:</strong> integrate or not. <strong>Default:</strong> look at the unintegrated embedding first; apply Harmony on sample only if nuclei of the same type separate by sample. <strong>Deviate:</strong> skip integration when samples already mix; never use integrated values for differential expression.</p>
+<p><strong>Decision:</strong> integrate or not. <strong>Default:</strong> look at the unintegrated embedding first; apply Harmony on sample if nuclei of the same type separate by sample. The notebook runs it either way, so you can compare the two embeddings below. <strong>Deviate:</strong> skip integration when samples already mix; never use integrated values for differential expression.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
@@ -2474,7 +2474,7 @@ Active assay: RNA (38606 features, 0 variable features)
   17      0.97      0.01      0.01       0.00       0.00       0.00</code></pre>
 </div>
 </div>
-<p>A cluster made almost entirely of one sample is either biology specific to that donor or a leftover artifact. Check its QC metrics before believing it.</p>
+<p>A cluster made almost entirely of one sample is either biology specific to that donor or a leftover artifact. Check its QC metrics before believing it. In our run, cluster 17 (67 nuclei) came almost entirely from control_1. Its markers match intercalated type A cells, so we gave it that label, which pools it with cluster 7 for the comparison between conditions.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
@@ -2637,7 +2637,7 @@ Active assay: RNA (38606 features, 0 variable features)
 </section>
 <section id="differential-expression-between-conditions" class="level2">
 <h2 class="anchored" data-anchor-id="differential-expression-between-conditions">8. Differential expression between conditions</h2>
-<p><strong>Decision:</strong> unit of replication. <strong>Default:</strong> pseudobulk, summing raw counts per cell type per sample, then DESeq2 with samples as replicates. <strong>Deviate:</strong> mixed models when you have many donors and need covariates at the cell level. Never a per-nucleus Wilcoxon between conditions.</p>
+<p><strong>Decision:</strong> unit of replication. <strong>Default:</strong> pseudobulk, summing counts per cell type per sample, then DESeq2 with samples as replicates. <strong>Deviate:</strong> mixed models when you have many donors and need covariates at the cell level. Never a per-nucleus Wilcoxon between conditions.</p>
 <p>Counts here are the ambient-corrected integers. Whether to use corrected or uncorrected counts for pseudobulk is an open question, so the uncorrected assay is kept and the comparison is one argument away.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -2782,28 +2782,34 @@ converting counts to integer mode</code></pre>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;clusterProfiler&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> de[[top_ct]]</span>
-<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  sig <span class="ot">&lt;-</span> res<span class="sc">$</span>gene[<span class="fu">which</span>(res<span class="sc">$</span>padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)]</span>
-<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  t2g <span class="ot">&lt;-</span> <span class="fu">stack</span>(sets)[, <span class="dv">2</span><span class="sc">:</span><span class="dv">1</span>]</span>
-<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(sig) <span class="sc">&gt;=</span> <span class="dv">10</span>)</span>
-<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">head</span>(<span class="fu">as.data.frame</span>(clusterProfiler<span class="sc">::</span><span class="fu">enricher</span>(sig, <span class="at">universe =</span> res<span class="sc">$</span>gene, <span class="at">TERM2GENE =</span> t2g))[, <span class="fu">c</span>(<span class="st">&quot;ID&quot;</span>, <span class="st">&quot;GeneRatio&quot;</span>, <span class="st">&quot;BgRatio&quot;</span>, <span class="st">&quot;p.adjust&quot;</span>)], <span class="dv">10</span>)</span>
-<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> <span class="fu">cat</span>(<span class="st">&quot;Fewer than 10 significant genes in&quot;</span>, top_ct, <span class="st">&quot;so ORA is not informative here.</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
-<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> de[[top_ct]]</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>sig <span class="ot">&lt;-</span> res<span class="sc">$</span>gene[<span class="fu">which</span>(res<span class="sc">$</span>padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)]</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>t2g <span class="ot">&lt;-</span> <span class="fu">stack</span>(sets)[, <span class="dv">2</span><span class="sc">:</span><span class="dv">1</span>]</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(sig) <span class="sc">&gt;=</span> <span class="dv">10</span>) {</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>  ora <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(clusterProfiler<span class="sc">::</span><span class="fu">enricher</span>(sig, <span class="at">universe =</span> res<span class="sc">$</span>gene, <span class="at">TERM2GENE =</span> t2g))</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">nrow</span>(ora) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">cat</span>(<span class="st">&quot;No gene set is enriched among the&quot;</span>, <span class="fu">length</span>(sig), <span class="st">&quot;significant genes in&quot;</span>, top_ct, <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>(ora[, <span class="fu">c</span>(<span class="st">&quot;ID&quot;</span>, <span class="st">&quot;GeneRatio&quot;</span>, <span class="st">&quot;BgRatio&quot;</span>, <span class="st">&quot;p.adjust&quot;</span>)], <span class="dv">10</span>)</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">&quot;Fewer than 10 significant genes in&quot;</span>, top_ct, <span class="st">&quot;so ORA is not informative here.</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
+<div class="cell-output cell-output-stdout">
+<pre><code>No gene set is enriched among the 21 significant genes in Cortical Thick Ascending Limb </code></pre>
+</div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] ID        GeneRatio BgRatio   p.adjust 
 &lt;0 rows&gt; (or 0-length row.names)</code></pre>
 </div>
 </div>
+<p>With only a few dozen significant genes, over-representation usually finds nothing. That is why GSEA, which uses every gene’s ranking, is the main pathway method here.</p>
 </section>
 <section id="save" class="level2">
 <h2 class="anchored" data-anchor-id="save">Save</h2>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(obj, <span class="st">&quot;results/kidney_snrna_annotated.rds&quot;</span>)</span>
-<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(obj, <span class="st">&quot;results/kidney_snrna_annotated.rds&quot;</span>)</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>R version 4.6.1 (2026-06-24)

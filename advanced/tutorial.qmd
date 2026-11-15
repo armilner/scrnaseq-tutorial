@@ -119,7 +119,7 @@ obj
 
 ## 4. Normalization
 
-**Decision:** which normalization feeds which step. **Default:** SCTransform per sample for PCA, clustering and UMAP; log-normalized RNA for marker tests and plots; raw counts for pseudobulk. **Deviate:** log-normalization throughout is a valid simpler choice and usually gives very similar clusters.
+**Decision:** which normalization feeds which step. **Default:** SCTransform per sample for PCA, clustering and UMAP; log-normalized RNA for marker tests and plots; ambient-corrected counts for pseudobulk. **Deviate:** log-normalization throughout is a valid simpler choice and usually gives very similar clusters.
 
 After `merge`, each sample is its own layer, so SCTransform fits one model per sample.
 
@@ -131,7 +131,7 @@ ElbowPlot(obj, ndims = 50)
 
 ## 5. Integration
 
-**Decision:** integrate or not. **Default:** look at the unintegrated embedding first; apply Harmony on sample only if nuclei of the same type separate by sample. **Deviate:** skip integration when samples already mix; never use integrated values for differential expression.
+**Decision:** integrate or not. **Default:** look at the unintegrated embedding first; apply Harmony on sample if nuclei of the same type separate by sample. The notebook runs it either way, so you can compare the two embeddings below. **Deviate:** skip integration when samples already mix; never use integrated values for differential expression.
 
 ```{r integrate, fig.width=11, fig.height=4.5}
 dims <- 1:params$npcs
@@ -149,7 +149,7 @@ obj <- FindClusters(obj, resolution = params$resolution, verbose = FALSE)
 round(prop.table(table(obj$seurat_clusters, obj$sample), 1), 2)
 ```
 
-A cluster made almost entirely of one sample is either biology specific to that donor or a leftover artifact. Check its QC metrics before believing it.
+A cluster made almost entirely of one sample is either biology specific to that donor or a leftover artifact. Check its QC metrics before believing it. In our run, cluster 17 (67 nuclei) came almost entirely from control_1. Its markers match intercalated type A cells, so we gave it that label, which pools it with cluster 7 for the comparison between conditions.
 
 ```{r qc-second-pass, fig.width=10, fig.height=3.5}
 VlnPlot(obj, c("nFeature_RNA", "percent.mt", "doublet_score"), pt.size = 0, ncol = 3)
@@ -217,7 +217,7 @@ DimPlot(obj, reduction = "umap", group.by = "celltype", label = TRUE, repel = TR
 
 ## 8. Differential expression between conditions
 
-**Decision:** unit of replication. **Default:** pseudobulk, summing raw counts per cell type per sample, then DESeq2 with samples as replicates. **Deviate:** mixed models when you have many donors and need covariates at the cell level. Never a per-nucleus Wilcoxon between conditions.
+**Decision:** unit of replication. **Default:** pseudobulk, summing counts per cell type per sample, then DESeq2 with samples as replicates. **Deviate:** mixed models when you have many donors and need covariates at the cell level. Never a per-nucleus Wilcoxon between conditions.
 
 Counts here are the ambient-corrected integers. Whether to use corrected or uncorrected counts for pseudobulk is an open question, so the uncorrected assay is kept and the comparison is one argument away.
 
@@ -297,15 +297,19 @@ gsea[[top_ct]] |> as.data.frame() |> filter(!is.na(padj)) |> slice_min(padj, n =
 Over-representation with the correct background, for comparison:
 
 ```{r ora}
-if (requireNamespace("clusterProfiler", quietly = TRUE)) {
-  res <- de[[top_ct]]
-  sig <- res$gene[which(res$padj < 0.05)]
-  t2g <- stack(sets)[, 2:1]
-  if (length(sig) >= 10)
-    head(as.data.frame(clusterProfiler::enricher(sig, universe = res$gene, TERM2GENE = t2g))[, c("ID", "GeneRatio", "BgRatio", "p.adjust")], 10)
-  else cat("Fewer than 10 significant genes in", top_ct, "so ORA is not informative here.\n")
+res <- de[[top_ct]]
+sig <- res$gene[which(res$padj < 0.05)]
+t2g <- stack(sets)[, 2:1]
+if (length(sig) >= 10) {
+  ora <- as.data.frame(clusterProfiler::enricher(sig, universe = res$gene, TERM2GENE = t2g))
+  if (nrow(ora) == 0) cat("No gene set is enriched among the", length(sig), "significant genes in", top_ct, "\n")
+  head(ora[, c("ID", "GeneRatio", "BgRatio", "p.adjust")], 10)
+} else {
+  cat("Fewer than 10 significant genes in", top_ct, "so ORA is not informative here.\n")
 }
 ```
+
+With only a few dozen significant genes, over-representation usually finds nothing. That is why GSEA, which uses every gene's ranking, is the main pathway method here.
 
 ## Save
 
