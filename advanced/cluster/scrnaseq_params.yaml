@@ -1,0 +1,11 @@
+# nf-core/scrnaseq 4.2.0. Parameter names checked against nextflow_schema.json at that tag.
+input: "samplesheet_scrnaseq.csv"
+outdir: "results_scrnaseq"
+aligner: "cellranger"
+# Libraries are 10x 5' with a 26 bp R1, so R2-only 5' chemistry. Not in protocols.json,
+# so the pipeline passes it to cellranger count --chemistry unchanged.
+protocol: "SC5P-R2"
+
+# cellranger_index is passed on the command line by cellranger.slurm (refdata-gex-GRCh38-2024-A)
+# The tutorial does ambient correction with SoupX on the raw matrix, so CellBender is not needed.
+skip_cellbender: true

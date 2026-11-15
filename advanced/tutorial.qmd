@@ -182,18 +182,15 @@ DotPlot(obj, features = canonical, assay = "RNA") + RotatedAxis() + theme(strip.
 ```
 
 ```{r reference}
-obj$reference_label <- NA_character_
-if (requireNamespace("Azimuth", quietly = TRUE)) {
-  az <- tryCatch(Azimuth::RunAzimuth(obj, reference = "kidneyref"), error = function(e) { message(e); NULL })
-  if (!is.null(az)) {
-    lab <- grep("^predicted\\.annotation\\.l2$", names(az@meta.data), value = TRUE)
-    if (length(lab)) obj$reference_label <- az@meta.data[colnames(obj), lab]
-    rm(az)
-  }
-}
+# Azimuth downloads the kidney reference the first time, so this step needs internet
+# and a writable R library (run.sh sets one up in .Rlib).
+az <- Azimuth::RunAzimuth(obj, reference = "kidneyref")
+stopifnot("predicted.annotation.l2" %in% names(az@meta.data))
+obj$reference_label <- az@meta.data[colnames(obj), "predicted.annotation.l2"]
+rm(az)
 ```
 
-The proposed label for each cluster is written to `results/annotation_proposed.csv`. Review it against the dot plot and the marker table, edit the `celltype` column, and save it as `annotation_approved.csv` in the project folder. The notebook uses the approved file when it exists.
+The proposed label for each cluster is written to `results/annotation_proposed.csv`. Review it against the dot plot and the marker table, edit the `celltype` column, and save it as `annotation_approved.csv` in the project folder. The notebook uses the approved file when it exists. This repository ships the file from our run, and the notebook stops if its clusters and sizes do not match yours. In that case, delete it, render once, and review your own proposal.
 
 ```{r approve}
 proposed <- obj@meta.data |> group_by(cluster = seurat_clusters) |>
@@ -203,7 +200,13 @@ proposed <- obj@meta.data |> group_by(cluster = seurat_clusters) |>
   mutate(celltype = ifelse(is.na(reference_majority), paste0("cluster_", cluster), reference_majority))
 write.csv(proposed, "results/annotation_proposed.csv", row.names = FALSE)
 ann <- if (file.exists("annotation_approved.csv")) read.csv("annotation_approved.csv") else proposed
+# Labels belong to specific clusters. Stop if the approved file was made from different ones.
+sizes <- table(obj$seurat_clusters)
+if (!setequal(as.character(ann$cluster), names(sizes)) ||
+    any(ann$n != sizes[as.character(ann$cluster)]))
+  stop("annotation_approved.csv does not match these clusters. Delete it, render, and review results/annotation_proposed.csv.")
 obj$celltype <- ann$celltype[match(as.character(obj$seurat_clusters), as.character(ann$cluster))]
+stopifnot(!anyNA(obj$celltype))
 ann
 ```
 
@@ -219,6 +222,7 @@ DimPlot(obj, reduction = "umap", group.by = "celltype", label = TRUE, repel = TR
 Counts here are the ambient-corrected integers. Whether to use corrected or uncorrected counts for pseudobulk is an open question, so the uncorrected assay is kept and the comparison is one argument away.
 
 ```{r pseudobulk}
+#| message: true
 pseudobulk <- function(obj, assay = "RNA") {
   cts <- GetAssayData(JoinLayers(obj[[assay]]), layer = "counts")
   grp <- factor(paste(obj$celltype, obj$sample, sep = "__"))
@@ -230,7 +234,12 @@ run_de <- function(ct, min_cells = 10) {
   cols <- names(pb$ncells)[sub("__.*", "", names(pb$ncells)) == ct & pb$ncells >= min_cells]
   cd <- data.frame(sample = sub(".*__", "", cols), row.names = cols)
   cd$condition <- factor(ss$condition[match(cd$sample, ss$sample)], levels = c("control", "diabetic"))
-  if (any(table(cd$condition) < 2)) return(NULL)
+  left_out <- setdiff(ss$sample, cd$sample)
+  if (length(left_out)) message(ct, ": left out ", paste(left_out, collapse = ", "), " (fewer than ", min_cells, " nuclei)")
+  if (any(table(cd$condition) < 2)) {
+    message(ct, ": not tested, fewer than 2 samples in a condition")
+    return(NULL)
+  }
   m <- pb$counts[, cols]
   m <- m[rowSums(m >= 10) >= min(table(cd$condition)), ]
   dds <- DESeq(DESeqDataSetFromMatrix(m, cd, ~ condition), quiet = TRUE)

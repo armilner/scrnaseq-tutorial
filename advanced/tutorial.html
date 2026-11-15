@@ -2551,18 +2551,15 @@ Active assay: RNA (38606 features, 0 variable features)
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>reference_label <span class="ot">&lt;-</span> <span class="cn">NA_character_</span></span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;Azimuth&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  az <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(Azimuth<span class="sc">::</span><span class="fu">RunAzimuth</span>(obj, <span class="at">reference =</span> <span class="st">&quot;kidneyref&quot;</span>), <span class="at">error =</span> <span class="cf">function</span>(e) { <span class="fu">message</span>(e); <span class="cn">NULL</span> })</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(az)) {</span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    lab <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="st">&quot;^predicted</span><span class="sc">\\</span><span class="st">.annotation</span><span class="sc">\\</span><span class="st">.l2$&quot;</span>, <span class="fu">names</span>(az<span class="sc">@</span>meta.data), <span class="at">value =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">length</span>(lab)) obj<span class="sc">$</span>reference_label <span class="ot">&lt;-</span> az<span class="sc">@</span>meta.data[<span class="fu">colnames</span>(obj), lab]</span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">rm</span>(az)</span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Azimuth downloads the kidney reference the first time, so this step needs internet</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co"># and a writable R library (run.sh sets one up in .Rlib).</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>az <span class="ot">&lt;-</span> Azimuth<span class="sc">::</span><span class="fu">RunAzimuth</span>(obj, <span class="at">reference =</span> <span class="st">&quot;kidneyref&quot;</span>)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="st">&quot;predicted.annotation.l2&quot;</span> <span class="sc">%in%</span> <span class="fu">names</span>(az<span class="sc">@</span>meta.data))</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>reference_label <span class="ot">&lt;-</span> az<span class="sc">@</span>meta.data[<span class="fu">colnames</span>(obj), <span class="st">&quot;predicted.annotation.l2&quot;</span>]</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(az)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<p>The proposed label for each cluster is written to <code>results/annotation_proposed.csv</code>. Review it against the dot plot and the marker table, edit the <code>celltype</code> column, and save it as <code>annotation_approved.csv</code> in the project folder. The notebook uses the approved file when it exists.</p>
+<p>The proposed label for each cluster is written to <code>results/annotation_proposed.csv</code>. Review it against the dot plot and the marker table, edit the <code>celltype</code> column, and save it as <code>annotation_approved.csv</code> in the project folder. The notebook uses the approved file when it exists. This repository ships the file from our run, and the notebook stops if its clusters and sizes do not match yours. In that case, delete it, render once, and review your own proposal.</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
@@ -2573,8 +2570,14 @@ Active assay: RNA (38606 features, 0 variable features)
 <span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">celltype =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(reference_majority), <span class="fu">paste0</span>(<span class="st">&quot;cluster_&quot;</span>, cluster), reference_majority))</span>
 <span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(proposed, <span class="st">&quot;results/annotation_proposed.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>ann <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">file.exists</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>)) <span class="fu">read.csv</span>(<span class="st">&quot;annotation_approved.csv&quot;</span>) <span class="cf">else</span> proposed</span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ann<span class="sc">$</span>celltype[<span class="fu">match</span>(<span class="fu">as.character</span>(obj<span class="sc">$</span>seurat_clusters), <span class="fu">as.character</span>(ann<span class="sc">$</span>cluster))]</span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>ann</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Labels belong to specific clusters. Stop if the approved file was made from different ones.</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>sizes <span class="ot">&lt;-</span> <span class="fu">table</span>(obj<span class="sc">$</span>seurat_clusters)</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">setequal</span>(<span class="fu">as.character</span>(ann<span class="sc">$</span>cluster), <span class="fu">names</span>(sizes)) <span class="sc">||</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">any</span>(ann<span class="sc">$</span>n <span class="sc">!=</span> sizes[<span class="fu">as.character</span>(ann<span class="sc">$</span>cluster)]))</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">&quot;annotation_approved.csv does not match these clusters. Delete it, render, and review results/annotation_proposed.csv.&quot;</span>)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>obj<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ann<span class="sc">$</span>celltype[<span class="fu">match</span>(<span class="fu">as.character</span>(obj<span class="sc">$</span>seurat_clusters), <span class="fu">as.character</span>(ann<span class="sc">$</span>cluster))]</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="sc">!</span><span class="fu">anyNA</span>(obj<span class="sc">$</span>celltype))</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>ann</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>   cluster    n                           reference_majority agreement
@@ -2650,18 +2653,53 @@ Active assay: RNA (38606 features, 0 variable features)
 <span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>  cols <span class="ot">&lt;-</span> <span class="fu">names</span>(pb<span class="sc">$</span>ncells)[<span class="fu">sub</span>(<span class="st">&quot;__.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">names</span>(pb<span class="sc">$</span>ncells)) <span class="sc">==</span> ct <span class="sc">&amp;</span> pb<span class="sc">$</span>ncells <span class="sc">&gt;=</span> min_cells]</span>
 <span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>  cd <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">sample =</span> <span class="fu">sub</span>(<span class="st">&quot;.*__&quot;</span>, <span class="st">&quot;&quot;</span>, cols), <span class="at">row.names =</span> cols)</span>
 <span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  cd<span class="sc">$</span>condition <span class="ot">&lt;-</span> <span class="fu">factor</span>(ss<span class="sc">$</span>condition[<span class="fu">match</span>(cd<span class="sc">$</span>sample, ss<span class="sc">$</span>sample)], <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;control&quot;</span>, <span class="st">&quot;diabetic&quot;</span>))</span>
-<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">any</span>(<span class="fu">table</span>(cd<span class="sc">$</span>condition) <span class="sc">&lt;</span> <span class="dv">2</span>)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
-<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> pb<span class="sc">$</span>counts[, cols]</span>
-<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> m[<span class="fu">rowSums</span>(m <span class="sc">&gt;=</span> <span class="dv">10</span>) <span class="sc">&gt;=</span> <span class="fu">min</span>(<span class="fu">table</span>(cd<span class="sc">$</span>condition)), ]</span>
-<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(<span class="fu">DESeqDataSetFromMatrix</span>(m, cd, <span class="sc">~</span> condition), <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;diabetic&quot;</span>, <span class="st">&quot;control&quot;</span>)))</span>
-<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>  res<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">rownames</span>(res); res<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ct</span>
-<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>  res[<span class="fu">order</span>(res<span class="sc">$</span>pvalue), ]</span>
-<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>de <span class="ot">&lt;-</span> <span class="fu">Filter</span>(<span class="fu">Negate</span>(is.null), <span class="fu">lapply</span>(<span class="fu">setNames</span>(<span class="at">nm =</span> <span class="fu">unique</span>(obj<span class="sc">$</span>celltype)), run_de))</span>
-<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>de_all <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, de)</span>
-<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(de_all, <span class="st">&quot;results/pseudobulk_DE.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>de_all <span class="sc">|&gt;</span> <span class="fu">group_by</span>(celltype) <span class="sc">|&gt;</span> <span class="fu">summarise</span>(<span class="at">tested =</span> <span class="fu">n</span>(), <span class="at">sig =</span> <span class="fu">sum</span>(padj <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(sig))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>  left_out <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(ss<span class="sc">$</span>sample, cd<span class="sc">$</span>sample)</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(left_out)) <span class="fu">message</span>(ct, <span class="st">&quot;: left out &quot;</span>, <span class="fu">paste</span>(left_out, <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span>), <span class="st">&quot; (fewer than &quot;</span>, min_cells, <span class="st">&quot; nuclei)&quot;</span>)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">any</span>(<span class="fu">table</span>(cd<span class="sc">$</span>condition) <span class="sc">&lt;</span> <span class="dv">2</span>)) {</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">message</span>(ct, <span class="st">&quot;: not tested, fewer than 2 samples in a condition&quot;</span>)</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> pb<span class="sc">$</span>counts[, cols]</span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> m[<span class="fu">rowSums</span>(m <span class="sc">&gt;=</span> <span class="dv">10</span>) <span class="sc">&gt;=</span> <span class="fu">min</span>(<span class="fu">table</span>(cd<span class="sc">$</span>condition)), ]</span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(<span class="fu">DESeqDataSetFromMatrix</span>(m, cd, <span class="sc">~</span> condition), <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;diabetic&quot;</span>, <span class="st">&quot;control&quot;</span>)))</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>  res<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">rownames</span>(res); res<span class="sc">$</span>celltype <span class="ot">&lt;-</span> ct</span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>  res[<span class="fu">order</span>(res<span class="sc">$</span>pvalue), ]</span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>de <span class="ot">&lt;-</span> <span class="fu">Filter</span>(<span class="fu">Negate</span>(is.null), <span class="fu">lapply</span>(<span class="fu">setNames</span>(<span class="at">nm =</span> <span class="fu">unique</span>(obj<span class="sc">$</span>celltype)), run_de))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stderr">
+<pre><code>converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode
+converting counts to integer mode</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Afferent / Efferent Arteriole Endothelial: left out control_2 (fewer than 10 nuclei)</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>converting counts to integer mode</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Fibroblast: left out control_2 (fewer than 10 nuclei)</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>converting counts to integer mode</code></pre>
+</div>
+<details open class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>de_all <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, de)</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(de_all, <span class="st">&quot;results/pseudobulk_DE.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>de_all <span class="sc">|&gt;</span> <span class="fu">group_by</span>(celltype) <span class="sc">|&gt;</span> <span class="fu">summarise</span>(<span class="at">tested =</span> <span class="fu">n</span>(), <span class="at">sig =</span> <span class="fu">sum</span>(padj <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(sig))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 15 × 3
@@ -2692,16 +2730,16 @@ Active assay: RNA (38606 features, 0 variable features)
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>get_sets <span class="ot">&lt;-</span> <span class="cf">function</span>(collection, <span class="at">sub =</span> <span class="cn">NULL</span>) {</span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  f <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">formals</span>(msigdbr))</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  a <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">species =</span> <span class="st">&quot;Homo sapiens&quot;</span>)</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="st">&quot;collection&quot;</span> <span class="sc">%in%</span> f) { a<span class="sc">$</span>collection <span class="ot">&lt;-</span> collection; <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(sub)) a<span class="sc">$</span>subcollection <span class="ot">&lt;-</span> sub }</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> { a<span class="sc">$</span>category <span class="ot">&lt;-</span> collection; <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(sub)) a<span class="sc">$</span>subcategory <span class="ot">&lt;-</span> sub }</span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  d <span class="ot">&lt;-</span> <span class="fu">do.call</span>(msigdbr, a)</span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">split</span>(d<span class="sc">$</span>gene_symbol, d<span class="sc">$</span>gs_name)</span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>sets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">get_sets</span>(<span class="st">&quot;H&quot;</span>), <span class="fu">get_sets</span>(<span class="st">&quot;C2&quot;</span>, <span class="st">&quot;CP:REACTOME&quot;</span>))</span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(sets)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>get_sets <span class="ot">&lt;-</span> <span class="cf">function</span>(collection, <span class="at">sub =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>  f <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">formals</span>(msigdbr))</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  a <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">species =</span> <span class="st">&quot;Homo sapiens&quot;</span>)</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="st">&quot;collection&quot;</span> <span class="sc">%in%</span> f) { a<span class="sc">$</span>collection <span class="ot">&lt;-</span> collection; <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(sub)) a<span class="sc">$</span>subcollection <span class="ot">&lt;-</span> sub }</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> { a<span class="sc">$</span>category <span class="ot">&lt;-</span> collection; <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(sub)) a<span class="sc">$</span>subcategory <span class="ot">&lt;-</span> sub }</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  d <span class="ot">&lt;-</span> <span class="fu">do.call</span>(msigdbr, a)</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">split</span>(d<span class="sc">$</span>gene_symbol, d<span class="sc">$</span>gs_name)</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>sets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">get_sets</span>(<span class="st">&quot;H&quot;</span>), <span class="fu">get_sets</span>(<span class="st">&quot;C2&quot;</span>, <span class="st">&quot;CP:REACTOME&quot;</span>))</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(sets)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 1889</code></pre>
@@ -2710,27 +2748,27 @@ Active assay: RNA (38606 features, 0 variable features)
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>gsea <span class="ot">&lt;-</span> <span class="fu">lapply</span>(de, <span class="cf">function</span>(res) {</span>
-<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  r <span class="ot">&lt;-</span> res[<span class="sc">!</span><span class="fu">is.na</span>(res<span class="sc">$</span>stat), ]</span>
-<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  stats <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">setNames</span>(r<span class="sc">$</span>stat, r<span class="sc">$</span>gene), <span class="at">decreasing =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  out <span class="ot">&lt;-</span> <span class="fu">fgsea</span>(sets, stats, <span class="at">minSize =</span> <span class="dv">15</span>, <span class="at">maxSize =</span> <span class="dv">500</span>)</span>
-<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  out<span class="sc">$</span>celltype <span class="ot">&lt;-</span> res<span class="sc">$</span>celltype[<span class="dv">1</span>]</span>
-<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>  out[<span class="fu">order</span>(out<span class="sc">$</span>padj), ]</span>
-<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>})</span>
-<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>gsea_all <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, gsea)</span>
-<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>gsea_out <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(gsea_all)</span>
-<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>gsea_out<span class="sc">$</span>leadingEdge <span class="ot">&lt;-</span> <span class="fu">vapply</span>(gsea_out<span class="sc">$</span>leadingEdge, paste, <span class="st">&quot;&quot;</span>, <span class="at">collapse =</span> <span class="st">&quot;;&quot;</span>)</span>
-<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(gsea_out, <span class="st">&quot;results/gsea.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>gsea <span class="ot">&lt;-</span> <span class="fu">lapply</span>(de, <span class="cf">function</span>(res) {</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  r <span class="ot">&lt;-</span> res[<span class="sc">!</span><span class="fu">is.na</span>(res<span class="sc">$</span>stat), ]</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  stats <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">setNames</span>(r<span class="sc">$</span>stat, r<span class="sc">$</span>gene), <span class="at">decreasing =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  out <span class="ot">&lt;-</span> <span class="fu">fgsea</span>(sets, stats, <span class="at">minSize =</span> <span class="dv">15</span>, <span class="at">maxSize =</span> <span class="dv">500</span>)</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  out<span class="sc">$</span>celltype <span class="ot">&lt;-</span> res<span class="sc">$</span>celltype[<span class="dv">1</span>]</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>  out[<span class="fu">order</span>(out<span class="sc">$</span>padj), ]</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>gsea_all <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, gsea)</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>gsea_out <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(gsea_all)</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>gsea_out<span class="sc">$</span>leadingEdge <span class="ot">&lt;-</span> <span class="fu">vapply</span>(gsea_out<span class="sc">$</span>leadingEdge, paste, <span class="st">&quot;&quot;</span>, <span class="at">collapse =</span> <span class="st">&quot;;&quot;</span>)</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(gsea_out, <span class="st">&quot;results/gsea.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>top_ct <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">which.max</span>(<span class="fu">sapply</span>(gsea, <span class="cf">function</span>(x) <span class="fu">sum</span>(x<span class="sc">$</span>padj <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))))</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>gsea[[top_ct]] <span class="sc">|&gt;</span> <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(padj)) <span class="sc">|&gt;</span> <span class="fu">slice_min</span>(padj, <span class="at">n =</span> <span class="dv">20</span>, <span class="at">with_ties =</span> <span class="cn">FALSE</span>) <span class="sc">|&gt;</span></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(NES, <span class="fu">reorder</span>(pathway, NES), <span class="at">fill =</span> padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)) <span class="sc">+</span> <span class="fu">geom_col</span>() <span class="sc">+</span></span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="fu">paste</span>(<span class="st">&quot;GSEA, diabetic vs control:&quot;</span>, top_ct)) <span class="sc">+</span> <span class="fu">theme_bw</span>() <span class="sc">+</span></span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">7</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>top_ct <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">which.max</span>(<span class="fu">sapply</span>(gsea, <span class="cf">function</span>(x) <span class="fu">sum</span>(x<span class="sc">$</span>padj <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))))</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>gsea[[top_ct]] <span class="sc">|&gt;</span> <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(padj)) <span class="sc">|&gt;</span> <span class="fu">slice_min</span>(padj, <span class="at">n =</span> <span class="dv">20</span>, <span class="at">with_ties =</span> <span class="cn">FALSE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(NES, <span class="fu">reorder</span>(pathway, NES), <span class="at">fill =</span> padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)) <span class="sc">+</span> <span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="fu">paste</span>(<span class="st">&quot;GSEA, diabetic vs control:&quot;</span>, top_ct)) <span class="sc">+</span> <span class="fu">theme_bw</span>() <span class="sc">+</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">7</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
 <div>
@@ -2744,14 +2782,14 @@ Active assay: RNA (38606 features, 0 variable features)
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;clusterProfiler&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> de[[top_ct]]</span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  sig <span class="ot">&lt;-</span> res<span class="sc">$</span>gene[<span class="fu">which</span>(res<span class="sc">$</span>padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)]</span>
-<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  t2g <span class="ot">&lt;-</span> <span class="fu">stack</span>(sets)[, <span class="dv">2</span><span class="sc">:</span><span class="dv">1</span>]</span>
-<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(sig) <span class="sc">&gt;=</span> <span class="dv">10</span>)</span>
-<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">head</span>(<span class="fu">as.data.frame</span>(clusterProfiler<span class="sc">::</span><span class="fu">enricher</span>(sig, <span class="at">universe =</span> res<span class="sc">$</span>gene, <span class="at">TERM2GENE =</span> t2g))[, <span class="fu">c</span>(<span class="st">&quot;ID&quot;</span>, <span class="st">&quot;GeneRatio&quot;</span>, <span class="st">&quot;BgRatio&quot;</span>, <span class="st">&quot;p.adjust&quot;</span>)], <span class="dv">10</span>)</span>
-<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> <span class="fu">cat</span>(<span class="st">&quot;Fewer than 10 significant genes in&quot;</span>, top_ct, <span class="st">&quot;so ORA is not informative here.</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
-<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;clusterProfiler&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> de[[top_ct]]</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  sig <span class="ot">&lt;-</span> res<span class="sc">$</span>gene[<span class="fu">which</span>(res<span class="sc">$</span>padj <span class="sc">&lt;</span> <span class="fl">0.05</span>)]</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  t2g <span class="ot">&lt;-</span> <span class="fu">stack</span>(sets)[, <span class="dv">2</span><span class="sc">:</span><span class="dv">1</span>]</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(sig) <span class="sc">&gt;=</span> <span class="dv">10</span>)</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">head</span>(<span class="fu">as.data.frame</span>(clusterProfiler<span class="sc">::</span><span class="fu">enricher</span>(sig, <span class="at">universe =</span> res<span class="sc">$</span>gene, <span class="at">TERM2GENE =</span> t2g))[, <span class="fu">c</span>(<span class="st">&quot;ID&quot;</span>, <span class="st">&quot;GeneRatio&quot;</span>, <span class="st">&quot;BgRatio&quot;</span>, <span class="st">&quot;p.adjust&quot;</span>)], <span class="dv">10</span>)</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> <span class="fu">cat</span>(<span class="st">&quot;Fewer than 10 significant genes in&quot;</span>, top_ct, <span class="st">&quot;so ORA is not informative here.</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] ID        GeneRatio BgRatio   p.adjust 
@@ -2764,8 +2802,8 @@ Active assay: RNA (38606 features, 0 variable features)
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(obj, <span class="st">&quot;results/kidney_snrna_annotated.rds&quot;</span>)</span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(obj, <span class="st">&quot;results/kidney_snrna_annotated.rds&quot;</span>)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>R version 4.6.1 (2026-06-24)

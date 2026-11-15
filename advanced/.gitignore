@@ -1,0 +1,7 @@
+pipeline/
+data/
+results/
+logs/
+.Rlib/
+tutorial_files/
+*.rds

@@ -2,8 +2,8 @@
 pkgs <- c("Seurat", "SeuratObject", "sctransform", "glmGamPoi", "harmony", "SoupX",
           "scDblFinder", "SingleCellExperiment", "scuttle", "DESeq2", "fgsea",
           "msigdbr", "clusterProfiler", "presto", "Matrix", "ggplot2", "patchwork",
-          "dplyr", "knitr", "rmarkdown")
-optional <- c("Azimuth", "SeuratData", "msigdbdf", "quarto")
+          "dplyr", "knitr", "rmarkdown", "Azimuth", "SeuratData")
+optional <- c("msigdbdf", "quarto")
 status <- function(p) if (requireNamespace(p, quietly = TRUE)) as.character(packageVersion(p)) else "MISSING"
 cat("R:", R.version.string, "\n\nRequired\n")
 print(data.frame(package = pkgs, version = vapply(pkgs, status, "")), row.names = FALSE)
