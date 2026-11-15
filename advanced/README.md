@@ -1,6 +1,8 @@
-# Advanced tutorial (work in progress)
+# Advanced tutorial
 
-**Not finished yet.** It has not been run end to end. New to single-cell? Start with the [beginner tutorial](../beginner) instead.
+[Open the finished tutorial in your browser](https://armilner.github.io/scrnaseq-tutorial/advanced/tutorial.html).
+
+New to single-cell? Start with the [beginner tutorial](../beginner) instead. This one assumes you have access to a computing cluster.
 
 A full 10x single-nucleus workflow on a public human kidney dataset (GSE131882, 3 control vs 3 early diabetic nephropathy; Wilson et al., PNAS 2019). Each step states the decision, the default, and when to deviate.
 

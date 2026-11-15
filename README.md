@@ -17,7 +17,7 @@ Go to the [`beginner`](beginner) folder and follow the steps. It runs on a norma
 | Folder | What it is | Who it's for |
 |---|---|---|
 | [`beginner/`](beginner) | Complete analysis of blood cells from 8 people, untreated vs treated with interferon. Runs on a laptop. | Anyone new to single-cell |
-| [`advanced/`](advanced) | Kidney single-nucleus data, starting from raw sequencing files on a computing cluster. **Work in progress.** | People with cluster access |
+| [`advanced/`](advanced) | Kidney single-nucleus data, starting from raw sequencing files on a computing cluster. [Read it online](https://armilner.github.io/scrnaseq-tutorial/advanced/tutorial.html). | People with cluster access |
 
 ## License
 
