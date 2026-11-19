@@ -19,7 +19,7 @@ Along the way you'll learn every standard step: cleaning the data, removing doub
 | `tutorial.html` | The finished result, the same as the online version. |
 | `annotation_approved.csv` | The cell type names we checked by hand (step 9 of the tutorial). |
 
-You need a Mac or Windows computer with at least 8 GB of RAM and about 5 GB of free space. Setup takes about 30 minutes, most of it waiting for installs.
+You need a Mac, Windows or Linux computer with at least 8 GB of RAM and about 5 GB of free space. Setup takes about 30 minutes, most of it waiting for installs (longer on Linux, see below).
 
 ## Step 1. Install R
 
@@ -30,6 +30,15 @@ R is the programming language the analysis is written in.
    - Mac: pick the `.pkg` that matches your chip. Apple menu > About This Mac tells you if you have **Apple** (M1, M2, M3...) or **Intel**.
    - Windows: click **base**, then **Download R for Windows**.
 3. Open the downloaded file and click through the installer with the default options.
+
+**On Linux?** Click **Download R for Linux** and follow the steps for your distribution. Then install the system libraries the packages need. On Ubuntu or Debian, open a terminal and run:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libhdf5-dev libglpk-dev libpng-dev libfontconfig1-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libtiff5-dev libjpeg-dev
+```
+
+On Linux the packages are built from source code instead of downloaded ready-made, so Step 5 can take an hour or more. Everything else is the same.
 
 ## Step 2. Install RStudio
 
